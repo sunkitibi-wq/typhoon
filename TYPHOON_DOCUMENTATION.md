@@ -17,6 +17,18 @@
 7. [Frontend Pages](#7-frontend-pages)
 8. [Deployment Guide](#8-deployment-guide)
 9. [User Guide](#9-user-guide)
+10. [Authentication & Authorization](#10-authentication--authorization)
+11. [Configuration Reference](#11-configuration-reference)
+12. [Email & Notifications](#12-email--notifications)
+13. [Queue System & Background Jobs](#13-queue-system--background-jobs)
+14. [Error Handling & Logging](#14-error-handling--logging)
+15. [Testing Guide](#15-testing-guide)
+16. [Development Workflow](#16-development-workflow)
+17. [Security Best Practices](#17-security-best-practices)
+18. [Environment Variables](#18-environment-variables)
+19. [Performance Optimization](#19-performance-optimization)
+20. [Troubleshooting](#20-troubleshooting)
+21. [API Integrations](#21-api-integrations)
 
 ---
 
@@ -646,3 +658,956 @@ php artisan serve
 Admin:  admin@typhoon.com / password
 Client: client@typhoon.com / password
 ```
+
+---
+
+## 10. Authentication & Authorization
+
+### 10.1 Web Authentication (Laravel Fortify)
+
+Fortify handles all session-based web authentication flows:
+
+**Features:**
+- Registration with email verification
+- Login with "remember me" option
+- Password reset flow (email link)
+- 2FA/TOTP with recovery codes
+- Profile update with password confirmation
+
+**Key Files:**
+- `app/Actions/Fortify/` — Action classes for each flow
+- `config/fortify.php` — Fortify configuration
+- `routes/auth.php` — Auto-generated auth routes (handled by Fortify)
+
+**Two-Factor Setup:**
+```php
+// User initiates 2FA
+POST /auth/two-factor-auth { force_confirmation: false }
+
+// Responds with QR code for Authenticator app
+// User confirms by entering TOTP code
+
+// Recovery codes can be regenerated anytime
+POST /auth/two-factor-recovery-codes
+```
+
+### 10.2 API Authentication (Laravel Sanctum)
+
+Sanctum provides token-based API authentication:
+
+**Flow:**
+```
+1. User logs in via POST /login
+2. Response includes { token: "..." }
+3. All API requests: Authorization: Bearer {token}
+4. Token stored client-side (secure cookie or localStorage)
+```
+
+**Token Features:**
+- Stateless (no session required)
+- Bearer token format
+- Scopes for permission granularity
+- Can expire or be revoked
+- Multi-device support (separate tokens per device)
+
+**Usage:**
+```bash
+# Create token
+curl -X POST https://typhoon.com/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"..."}'
+
+# Use token
+curl -X GET https://typhoon.com/api/accounts \
+  -H "Authorization: Bearer {token}"
+```
+
+### 10.3 Role-Based Access Control (Spatie Laravel Permission)
+
+Permissions & roles are managed via Spatie package:
+
+**Roles:**
+- `admin` — Full platform access
+- `compliance` — KYC & monitoring access
+- `corporate_admin` — Business profile management
+- `corporate_finance` — Bulk payments & transfers
+- `corporate_operator` — Transaction initiation
+- `corporate_viewer` — Read-only access
+
+**Permissions:**
+- Scoped by feature (e.g., `kyc:approve`, `transfer:create`)
+- Assigned to roles
+- Checked via middleware and policies
+
+**Checking Permission:**
+```php
+// In controller
+$user->hasPermissionTo('kyc:approve') // true/false
+
+// In middleware
+Route::post('/kyc/{id}/approve', [...])->middleware('permission:kyc:approve');
+
+// In Blade
+@can('kyc:approve')
+  <button>Approve</button>
+@endcan
+```
+
+**Corporate Role Assignment:**
+```php
+$corporateUser = CorporateUser::where('business_profile_id', $business->id)
+    ->where('user_id', $user->id)
+    ->first();
+
+$corporateUser->role; // 'admin' | 'finance' | 'operator' | 'viewer'
+$corporateUser->spending_limit; // Per-user daily limit in cents
+```
+
+---
+
+## 11. Configuration Reference
+
+### 11.1 config/auth.php
+
+```php
+return [
+    'defaults' => [
+        'guard' => 'web',                   // Web uses sessions
+        'passwords' => 'users',
+    ],
+
+    'guards' => [
+        'web' => [
+            'driver' => 'session',
+            'provider' => 'users',
+        ],
+        'sanctum' => [
+            'driver' => 'sanctum',          // API uses Sanctum
+            'provider' => 'users',
+        ],
+    ],
+
+    'providers' => [
+        'users' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\User::class,
+        ],
+    ],
+];
+```
+
+### 11.2 config/fortify.php
+
+```php
+return [
+    'guard' => 'web',
+    'passwords' => 'users',
+
+    'features' => [
+        Features::registration(),               // Enable user signup
+        Features::resetPasswords(),
+        Features::emailVerification(),
+        Features::twoFactorAuthentication([
+            'confirmPassword' => false,
+        ]),
+    ],
+
+    'views' => true,                            // Use custom Fortify views
+];
+```
+
+### 11.3 config/sanctum.php
+
+```php
+return [
+    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', 'localhost,127.0.0.1')),
+    'expiration' => null,                       // Tokens never expire (until revoked)
+    'token_prefix' => 'typhoon',
+    'middleware' => [
+        'throttle:60,1',                        // Rate limit
+    ],
+];
+```
+
+### 11.4 config/cashier.php (Stripe Integration - Optional)
+
+```php
+return [
+    'model' => App\Models\User::class,
+    'key' => env('STRIPE_SECRET'),
+    'path' => 'stripe',
+    'webhook' => [
+        'secret' => env('STRIPE_WEBHOOK_SECRET'),
+        'tolerance' => 300,
+    ],
+];
+```
+
+### 11.5 config/queue.php
+
+```php
+return [
+    'default' => env('QUEUE_CONNECTION', 'database'),
+
+    'connections' => [
+        'database' => [
+            'driver' => 'database',
+            'table' => 'jobs',
+            'queue' => 'default',
+            'retry_after' => 86400,
+        ],
+
+        'redis' => [
+            'driver' => 'redis',
+            'connection' => 'default',
+            'queue' => env('REDIS_QUEUE', 'default'),
+            'retry_after' => 86400,
+            'block_for' => null,
+        ],
+    ],
+];
+```
+
+---
+
+## 12. Email & Notifications
+
+### 12.1 Email Configuration
+
+Set in `.env`:
+```
+MAIL_DRIVER=smtp
+MAIL_HOST=smtp.mailtrap.io
+MAIL_PORT=2525
+MAIL_USERNAME=...
+MAIL_PASSWORD=...
+MAIL_FROM_ADDRESS=noreply@typhoon.com
+MAIL_FROM_NAME="Typhoon Banking"
+```
+
+### 12.2 Notification Templates
+
+**Welcome Email** — `app/Mail/WelcomeMail.php`
+- Sent on registration
+- Contains activation link if email verification enabled
+
+**Transfer Confirmation** — `app/Notifications/TransferNotification.php`
+- Sent to recipient after internal transfer
+- Includes transaction reference
+
+**KYC Status Update** — `app/Notifications/KycApproved.php` / `KycRejected.php`
+- Notifies user on verification completion
+- Rejected: includes reason
+
+**Crypto Deposit Confirmed** — Event listener
+- Sends when blockchain confirms 3+ blocks
+
+**Loan Disbursement** — `LoanService::disburse()`
+- Notifies user when loan funded
+- Includes repayment schedule
+
+### 12.3 In-App Notifications
+
+Stored in `bank_notifications` table:
+```php
+BankNotification::create([
+    'user_id' => $user->id,
+    'type' => 'transfer_received',          // transfer_received, kyc_status, loan_.*
+    'channel' => 'in_app',                  // 'in_app' | 'email' | 'sms'
+    'title' => 'Transfer Received',
+    'body' => 'You received €100 from Alice',
+]);
+```
+
+---
+
+## 13. Queue System & Background Jobs
+
+### 13.1 Running the Queue Worker
+
+```bash
+# Development
+php artisan queue:work --verbose
+
+# Production (with supervisor)
+php artisan queue:work --timeout=60 --tries=3
+```
+
+### 13.2 Job Types
+
+| Job Class | Trigger | Purpose |
+|---|---|---|
+| `ProcessWebhookEvent` | Webhook received | Blockchain webhook processing |
+| `ConfirmCryptoDeposit` | After 3 confirmations | Credit user wallet + notify |
+| `ProcessRefund` | Transaction reversal | Reverse balance and ledger |
+| `GenerateStatement` | End-of-month | Create PDF statement |
+| `CheckOverdueLoans` | Daily scheduler | Default loans after 3 missed payments |
+| `SyncExchangeRates` | Hourly scheduler | Fetch latest rates from external feed |
+
+### 13.3 Scheduled Jobs (Cron)
+
+Configured in `app/Console/Kernel.php`:
+
+```php
+protected function schedule(Schedule $schedule)
+{
+    // Hourly exchange rate sync
+    $schedule->command('rates:sync')->hourly();
+
+    // Daily overdue loan check
+    $schedule->command('loans:check-overdue')->daily();
+
+    // Monthly statement generation
+    $schedule->command('statements:generate')->monthly();
+
+    // Every 5 minutes: check for pending webhook retries
+    $schedule->command('webhooks:retry')->everyFiveMinutes();
+}
+```
+
+**Install supervisor for production:**
+```ini
+[program:typhoon-queue]
+process_name=%(program_name)s_%(process_num)02d
+command=php /var/www/typhoon/artisan queue:work redis --sleep=3 --tries=3
+autostart=true
+autorestart=true
+numprocs=1
+redirect_stderr=true
+stdout_logfile=/var/log/typhoon-queue.log
+```
+
+---
+
+## 14. Error Handling & Logging
+
+### 14.1 Exception Handling
+
+All exceptions handled in `app/Exceptions/Handler.php`:
+
+```php
+public function register()
+{
+    $this->reportable(function (InsufficientFundsException $e) {
+        Log::warning('Insufficient funds', ['account' => $e->account_id]);
+    });
+
+    $this->renderable(function (InsufficientFundsException $e, $request) {
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    });
+}
+```
+
+### 14.2 Custom Exceptions
+
+| Exception | When | Status |
+|---|---|---|
+| `InsufficientFundsException` | Balance < amount | 422 |
+| `AccountLockedException` | Account frozen/closed | 403 |
+| `KycRequiredException` | User kyc_level insufficient | 403 |
+| `DuplicateTransactionException` | Idempotency key exists | 409 |
+| `BlockchainException` | Blockchain call fails | 502 |
+
+### 14.3 Logging Configuration
+
+Set in `.env`:
+```
+LOG_CHANNEL=stack
+LOG_LEVEL=info
+LOG_DAILY_DAYS=7
+```
+
+**Log Channels:**
+- `stack` — Combines multiple channels (daily file + Slack)
+- `single` — Writes to single `storage/logs/laravel.log`
+- `slack` — Sends critical errors to Slack channel
+
+**Log Levels:**
+```
+DEBUG < INFO < NOTICE < WARNING < ERROR < CRITICAL < ALERT < EMERGENCY
+```
+
+**Audit Logging Example:**
+```php
+// Every request logged to audit_logs table
+AuditLog::create([
+    'user_id' => auth()->id(),
+    'route_name' => $request->route()?->getName(),
+    'method' => $request->method(),
+    'url' => $request->getPathInfo(),
+    'ip' => $request->ip(),
+    'user_agent' => $request->userAgent(),
+    'request_payload' => $request->except(['password', 'token']),
+    'status_code' => $response->status(),
+]);
+```
+
+---
+
+## 15. Testing Guide
+
+### 15.1 Test Structure
+
+```
+tests/
+├── Feature/
+│   ├── AccountTest.php
+│   ├── TransactionTest.php
+│   ├── CryptoTest.php
+│   ├── KycTest.php
+│   └── AdminTest.php
+└── Unit/
+    ├── Services/
+    │   ├── AccountServiceTest.php
+    │   ├── TransactionServiceTest.php
+    │   └── ComplianceServiceTest.php
+    └── Models/
+        └── TransactionTest.php
+```
+
+### 15.2 Running Tests
+
+```bash
+# Run all tests
+php artisan test
+
+# Run specific file
+php artisan test tests/Feature/AccountTest.php
+
+# Run with coverage
+php artisan test --coverage
+
+# Run with specific env
+APP_ENV=testing php artisan test
+```
+
+### 15.3 Example Test
+
+```php
+class TransactionTest extends TestCase
+{
+    use RefreshDatabase;                    // Rollback DB after each test
+
+    public function test_can_transfer_between_accounts()
+    {
+        // Setup
+        $user = User::factory()->create();
+        $from = Account::factory()->for($user)->create(['balance' => 100_00]);
+        $to = Account::factory()->create(['balance' => 0]);
+
+        // Act
+        $response = $this->actingAs($user)->post('/banking/transfer', [
+            'from_account_id' => $from->id,
+            'to_account_id' => $to->id,
+            'amount' => 50_00,
+        ]);
+
+        // Assert
+        $response->assertRedirect('/banking/transactions');
+        $from->refresh();
+        $to->refresh();
+        $this->assertEquals(50_00, $from->balance);
+        $this->assertEquals(50_00, $to->balance);
+    }
+}
+```
+
+### 15.4 Database Seeding for Tests
+
+```php
+// Use BankingSeeder in test setup
+protected function setUp(): void
+{
+    parent::setUp();
+    $this->seed(BankingSeeder::class);
+}
+
+// Or per-test
+public function test_something()
+{
+    $this->seed(BankingSeeder::class);
+    // ...
+}
+```
+
+---
+
+## 16. Development Workflow
+
+### 16.1 Local Development Setup
+
+```bash
+# 1. Clone repo
+git clone https://github.com/led/typhoon-banking.git
+cd typhoon-banking
+
+# 2. Install dependencies
+composer install
+npm install
+
+# 3. Setup environment
+cp .env.example .env
+php artisan key:generate
+
+# 4. Database (SQLite for local)
+touch database/database.sqlite
+php artisan migrate
+php artisan db:seed --class=BankingSeeder
+
+# 5. Build frontend
+npm run dev        # Development (watch mode)
+npm run build      # Production build
+
+# 6. Run server
+php artisan serve  # Runs on http://localhost:8000
+```
+
+### 16.2 Code Standards
+
+**PHP Coding Style:**
+- PSR-12 (Laravel standard)
+- Checked with `./vendor/bin/pint`
+
+```bash
+# Fix style issues
+./vendor/bin/pint resources/ app/
+
+# Check without fixing
+./vendor/bin/pint --test
+```
+
+**Frontend:**
+- ESLint for JavaScript/TypeScript
+```bash
+npm run lint        # Check
+npm run lint:fix    # Fix
+```
+
+### 16.3 Git Workflow
+
+```bash
+# Feature branch
+git checkout -b feature/add-xyz-feature
+git add .
+git commit -m "feat: add xyz feature"
+git push origin feature/add-xyz-feature
+# → Create PR on GitHub
+
+# After merge
+git checkout main
+git pull
+git branch -d feature/add-xyz-feature
+```
+
+**Commit message format:**
+```
+<type>: <subject>
+
+<body>
+
+<footer>
+```
+
+Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`
+
+---
+
+## 17. Security Best Practices
+
+### 17.1 Input Validation
+
+Always validate user input using Form Requests:
+
+```php
+// app/Http/Requests/TransferRequest.php
+class TransferRequest extends FormRequest
+{
+    public function authorize()
+    {
+        return $this->user()->can('transfer:create');
+    }
+
+    public function rules()
+    {
+        return [
+            'from_account_id' => ['required', 'exists:accounts,id'],
+            'to_account_id' => ['required', 'exists:accounts,id', 'different:from_account_id'],
+            'amount' => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
+        ];
+    }
+}
+```
+
+### 17.2 Cross-Site Request Forgery (CSRF)
+
+- All non-GET requests include CSRF token
+- Token validated in `VerifyCsrfToken` middleware
+- Token rotated after login for security
+
+```blade
+<!-- Blade form -->
+<form method="POST">
+    @csrf
+    <!-- ... -->
+</form>
+
+// React form (via Inertia)
+<Form method="post" action={transfer()}>
+```
+
+### 17.3 SQL Injection Prevention
+
+Always use parameterized queries:
+
+```php
+// ✗ UNSAFE
+User::whereRaw("email = '$email'")->first();
+
+// ✓ SAFE
+User::where('email', $email)->first();
+User::whereIn('status', ['active', 'pending'])->get();
+```
+
+### 17.4 Rate Limiting
+
+Applied to sensitive endpoints:
+
+```php
+Route::post('/login', [AuthController::class, 'login'])
+    ->middleware('throttle:6,1');        // 6 attempts per 1 minute
+
+Route::post('/api/transfer', [...])->middleware('throttle:100,1');  // 100 req/min
+```
+
+### 17.5 Password Security
+
+- Passwords hashed using bcrypt (Laravel default)
+- Minimum 8 characters enforced in validation
+- Password reset link expires after 60 minutes
+- Cannot reuse last 5 passwords (corporate users)
+
+### 17.6 Two-Factor Authentication
+
+- TOTP (Time-based OTP) mandatory for admins
+- Recovery codes generated on setup (stored encrypted)
+- Regenerate codes periodically
+
+### 17.7 API Token Security
+
+- Tokens issued with narrow scopes
+- Client secret never transmitted in URLs
+- HTTPS required in production
+- Token expiration/revocation supported
+
+### 17.8 Data Encryption
+
+Sensitive fields encrypted at rest:
+
+```php
+// Automatically encrypted
+protected $encrypted = ['ssn', 'tax_id', 'bank_account_number'];
+
+// In database, stored as: "payload:..."
+// Automatically decrypted on retrieval
+```
+
+---
+
+## 18. Environment Variables
+
+### 18.1 Required Variables
+
+```bash
+### Application
+APP_NAME="Typhoon Banking"
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://typhoon.com
+APP_KEY=base64:xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+### Database
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=typhoon
+DB_USERNAME=postgres
+DB_PASSWORD=...
+
+### Cache & Session
+CACHE_DRIVER=redis
+CACHE_DEFAULT_TTL=3600
+SESSION_DRIVER=redis
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+REDIS_PASSWORD=null
+
+### Queue
+QUEUE_CONNECTION=redis
+
+### Mail
+MAIL_DRIVER=smtp
+MAIL_HOST=smtp.mailtrap.io
+MAIL_PORT=2525
+MAIL_USERNAME=...
+MAIL_PASSWORD=...
+MAIL_FROM_ADDRESS=noreply@typhoon.com
+
+### Authentication
+FORTIFY_FEATURES=registration,reset_passwords,email_verification,two_factor_authentication
+SANCTUM_STATEFUL_DOMAINS=typhoon.com,localhost:3000
+
+### Stripe (Optional)
+STRIPE_PUBLIC_KEY=pk_live_...
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+### Blockchain
+BLOCKCHAIN_NETWORK=mainnet              # mainnet or testnet
+BLOCKCHAIN_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/...
+BLOCKCHAIN_PRIVATE_KEY=... (DO NOT COMMIT)
+
+### Feature Flags
+FEATURE_CRYPTO_ENABLED=true
+FEATURE_CORPORATE_ENABLED=true
+FEATURE_SEPA_ENABLED=true
+FEATURE_SWIFT_ENABLED=true
+```
+
+---
+
+## 19. Performance Optimization
+
+### 19.1 Database Query Optimization
+
+**N+1 Query Problem:**
+```php
+// ✗ SLOW: 1 query + N queries for each user's accounts
+$users = User::all();
+foreach ($users as $user) {
+    echo $user->accounts->count();  // Query inside loop
+}
+
+// ✓ FAST: 2 queries total
+$users = User::with('accounts')->get();
+foreach ($users as $user) {
+    echo $user->accounts->count();  // No additional queries
+}
+```
+
+**Query Optimization Tips:**
+```php
+// Select only needed columns
+User::select(['id', 'name', 'email'])->get();
+
+// Use pagination for large result sets
+User::paginate(50);
+
+// Use indexes on frequently queried columns
+Schema::create('accounts', function (Blueprint $table) {
+    $table->index('user_id');       // User lookup
+    $table->index('status');        // Status filtering
+    $table->index(['user_id', 'status']);  // Composite index
+});
+```
+
+### 19.2 Caching Strategy
+
+```php
+// Cache account balance for 5 minutes
+$balance = Cache::remember("account:{$account->id}:balance", 300, function () use ($account) {
+    return $account->balance;
+});
+
+// Invalidate cache on transaction
+DB::transaction(function () {
+    $transaction->save();
+    Cache::forget("account:{$from->id}:balance");
+    Cache::forget("account:{$to->id}:balance");
+});
+```
+
+**What to Cache:**
+- Exchange rates (refreshed hourly)
+- User KYC status
+- Fee schedules
+- Portfolio calculations
+
+### 19.3 Frontend Performance
+
+**Code Splitting:**
+```tsx
+// Lazy load admin panel
+const AdminDashboard = lazy(() => import('./pages/admin/dashboard'));
+
+<Suspense fallback={<Spinner />}>
+    <AdminDashboard />
+</Suspense>
+```
+
+**Image Optimization:**
+- Use next-gen formats (WebP with fallbacks)
+- Lazy load below-the-fold images
+- Use responsive srcset
+
+---
+
+## 20. Troubleshooting
+
+### 20.1 Common Issues
+
+| Issue | Cause | Solution |
+|---|---|---|
+| `Call to undefined method Transaction::user()` | Relationship not defined | Add `public function user() { return $this->belongsTo(User::class); }` |
+| `Attempting to read property on null` | Model not found | Add null check or use `firstOrFail()` |
+| `CSRF token mismatch` | Token expired/missing | Regenerate page, check session config |
+| `Queue jobs not running` | Worker not running | Start: `php artisan queue:work` |
+| `Memory limit exceeded` | Large result set | Use pagination/chunking: `User::chunk(100, ...)` |
+| `Port 8000 already in use` | Another process using port | `php artisan serve --port=8001` |
+
+### 20.2 Debugging
+
+**Laravel Debugbar** (development only):
+```bash
+composer require barryvdh/laravel-debugbar --dev
+```
+
+Displays query count, timing, route info, logs.
+
+**Tinker REPL:**
+```bash
+php artisan tinker
+
+# Try queries
+>>> $user = User::first();
+>>> $user->accounts;
+>>> $user->accounts()->sum('balance');
+```
+
+**Log Inspection:**
+```bash
+tail -f storage/logs/laravel.log
+```
+
+### 20.3 Database Issues
+
+**Reset Database (development only):**
+```bash
+php artisan migrate:refresh --seed
+```
+
+**Check Migrations:**
+```bash
+php artisan migrate:status
+```
+
+**Rollback Last Migration:**
+```bash
+php artisan migrate:rollback
+```
+
+---
+
+## 21. API Integrations
+
+### 21.1 Blockchain RPC Calls
+
+The `BlockchainService` handles Ethereum/EVM blockchain interaction:
+
+```php
+// Generate new address
+$keypair = $blockchain->generateAddress();
+// Returns: ['address' => '0x...', 'privateKey' => '0x...']
+
+// Check wallet balance
+$balance = $blockchain->getBalance($address);
+// Returns: balance in wei (string)
+
+// Send transaction
+$txHash = $blockchain->sendTransaction(
+    $fromAddress,
+    $toAddress,
+    $amountInWei,
+    $data  // Optional smart contract data
+);
+
+// Get transaction status
+$status = $blockchain->getTransactionStatus($txHash);
+// Returns: { confirmations: 5, status: 'confirmed' }
+
+// Watch address for incoming deposits
+$blockchain->watchDeposits($address);
+// Emits event when transaction detected
+```
+
+### 21.2 Exchange Rate Feed Integration
+
+Exchange rates updated hourly via external feed:
+
+```php
+// Artisan command
+php artisan rates:sync
+
+// Implementation
+CryptoExchangeService::syncExchangeRates();
+// Fetches from configured source, updates database
+```
+
+### 21.3 Email Service (Mailtrap/SendGrid)
+
+Emails sent asynchronously via queue:
+
+```php
+// Mail is queued automatically
+Mail::queue(new WelcomeMail($user));
+
+// Or sent immediately
+Mail::send(new WelcomeMail($user));
+```
+
+### 21.4 SMS Notifications (Optional - Twilio)
+
+```php
+// In notification class
+public function toSms($notifiable)
+{
+    return (new TwilioSms())
+        ->setMessage("Your KYC verification was approved.");
+}
+```
+
+---
+
+## Complete Development Checklist
+
+### Before Deploying to Production:
+- [ ] All tests pass: `php artisan test`
+- [ ] Code style fixed: `./vendor/bin/pint`
+- [ ] Linting clean: `npm run lint`
+- [ ] Environment variables set
+- [ ] Database migrations run
+- [ ] Cache cleared: `php artisan cache:clear`
+- [ ] Assets built: `npm run build`
+- [ ] Queue worker configured (supervisor)
+- [ ] Scheduler cron job configured
+- [ ] HTTPS certificates installed
+- [ ] Backup strategy in place
+- [ ] Monitoring/alerting configured
+- [ ] Documentation updated
+
+---
+
+## Version History
+
+| Version | Date | Notes |
+|---|---|---|
+| 1.0 | May 2026 | Initial MVP release |
+| 1.1 | Jun 2026 | Enhanced auth, API improvements |
+| 1.2 | Jul 2026 | Crypto integration complete, AI monitoring |
+
+---
+
+**Last Updated:** May 21, 2026  
+**Maintainer:** Typhoon Banking Dev Team  
+**License:** Proprietary — All Rights Reserved
