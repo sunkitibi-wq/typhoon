@@ -11,10 +11,11 @@ class ExchangeRate extends Model
         'change_24h', 'volume_24h', 'high_24h', 'low_24h', 'last_refreshed_at',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'last_refreshed_at' => 'datetime',
-        ];
-    }
+    protected $casts = [
+        'bid' => 'float',
+        'ask' => 'float',
+        'mid_rate' => 'float',
+        'change_24h' => 'float',
+        'last_refreshed_at' => 'datetime',
+    ];
 }
