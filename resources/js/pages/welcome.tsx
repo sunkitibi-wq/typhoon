@@ -179,8 +179,8 @@ export default function Welcome({
                                                                 ? rate.mid_rate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) 
                                                                 : rate.mid_rate.toFixed(5)} €
                                                         </p>
-                                                        <p className={`text-xs font-semibold ${rate.change_24h >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                                            {rate.change_24h >= 0 ? '+' : ''}{rate.change_24h.toFixed(2)}%
+                                                        <p className={`text-xs font-semibold ${Number(rate.change_24h) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                            {Number(rate.change_24h) >= 0 ? '+' : ''}{Number(rate.change_24h).toFixed(2)}%
                                                         </p>
                                                     </div>
                                                 </div>
