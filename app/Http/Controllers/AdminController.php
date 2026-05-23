@@ -46,19 +46,53 @@ class AdminController extends Controller
 
     public function kyc()
     {
-        $pending = KycVerification::with('user')
-            ->where('status', 'pending')
+        $submissions = KycVerification::with('user', 'documents')
             ->latest()
-            ->get();
+            ->get()
+            ->map(fn($k) => [
+                'id' => $k->id,
+                'user_id' => $k->user_id,
+                'user_name' => $k->user->name,
+                'user_email' => $k->user->email,
+                'status' => $k->status,
+                'kyc_level' => $k->kyc_level,
+                'country' => $k->country,
+                'date_of_birth' => $k->date_of_birth,
+                'id_type' => $k->id_type,
+                'id_number' => $k->id_number,
+                'address_line1' => $k->address_line1,
+                'city' => $k->city,
+                'postal_code' => $k->postal_code,
+                'documents_count' => $k->documents->count(),
+                'created_at' => $k->created_at,
+                'submitted_at' => $k->created_at,
+                'verified_at' => $k->verified_at,
+                'verification_details' => [
+                    'user' => [
+                        'id' => $k->user->id,
+                        'name' => $k->user->name,
+                        'email' => $k->user->email,
+                        'phone' => $k->user->phone,
+                    ],
+                    'documents' => $k->documents->map(fn($doc) => [
+                        'id' => $doc->id,
+                        'document_type' => $doc->document_type,
+                        'status' => $doc->status,
+                        'created_at' => $doc->created_at,
+                    ]),
+                ],
+            ]);
+
+        $stats = [
+            'pending' => KycVerification::where('status', 'pending')->count(),
+            'approved' => KycVerification::where('status', 'approved')->count(),
+            'rejected' => KycVerification::where('status', 'rejected')->count(),
+            'total' => KycVerification::count(),
+        ];
 
         return Inertia::render('admin/kyc-verification', [
-            'pending' => $pending->map(fn($k) => [
-                'id' => $k->id,
-                'user' => ['id' => $k->user->id, 'name' => $k->user->name, 'email' => $k->user->email],
-                'kyc_level' => $k->kyc_level,
-                'status' => $k->status,
-                'created_at' => $k->created_at,
-            ]),
+            'submissions' => $submissions,
+            'stats' => $stats,
         ]);
     }
 

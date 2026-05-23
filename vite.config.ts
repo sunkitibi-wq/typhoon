@@ -28,4 +28,18 @@ export default defineConfig({
             formVariants: true,
         }),
     ],
+    server: {
+        host: 'localhost',
+        port: 5173,
+        strictPort: false,
+        // Allow the dev server to reflect the requesting origin for CORS
+        // so browser requests from http://example-app.test are accepted.
+        cors: { origin: true },
+        hmr: {
+            protocol: 'ws',
+            host: 'localhost',
+            port: 5173,
+            clientPort: 5173,
+        },
+    },
 });

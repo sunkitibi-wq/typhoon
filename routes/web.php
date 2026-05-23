@@ -33,6 +33,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('transactions', [BankingController::class, 'transactions'])->name('transactions');
         Route::match(['get', 'post'], 'transfer', [BankingController::class, 'transfer'])->name('transfer');
         Route::match(['get', 'post'], 'kyc', [BankingController::class, 'kyc'])->name('kyc');
+        Route::get('kyc-status', [BankingController::class, 'kycStatus'])->name('kyc-status');
         Route::match(['get', 'post'], 'crypto', [BankingController::class, 'crypto'])->name('crypto');
         Route::match(['get', 'post'], 'beneficiaries', [BankingController::class, 'beneficiaries'])->name('beneficiaries');
         Route::delete('beneficiaries/{beneficiary}', [BankingController::class, 'destroyBeneficiary'])->name('beneficiaries.destroy');

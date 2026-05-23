@@ -42,14 +42,16 @@ class KycTest extends TestCase
     {
         $response = $this->actingAs($this->user)->post(route('banking.kyc'), [
             'country' => 'DE',
+            'nationality' => 'German',
             'date_of_birth' => '1990-01-15',
             'id_type' => 'passport',
             'id_number' => 'P12345678',
             'address_line1' => 'Main Street 123',
             'city' => 'Berlin',
+            'postal_code' => '10115',
         ]);
 
-        $response->assertSessionHas('success', 'KYC submitted successfully');
+        $response->assertSessionHas('success', 'KYC submitted successfully. We will review your submission within 1-2 business days.');
 
         $this->assertDatabaseHas('kyc_verifications', [
             'user_id' => $this->user->id,
@@ -100,7 +102,7 @@ class KycTest extends TestCase
         $response->assertOk();
         $response->assertInertia(fn ($page) => $page
             ->component('admin/kyc-verification')
-            ->has('pending', 1)
+            ->where('stats.pending', 1)
         );
     }
 

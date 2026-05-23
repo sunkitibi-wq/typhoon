@@ -1579,6 +1579,1227 @@ public function toSms($notifiable)
 
 ---
 
+## 22. Broadcasting & Real-Time Features
+
+### 22.1 Laravel Reverb WebSocket Setup
+
+Reverb provides real-time WebSocket broadcasting for live updates:
+
+**Configuration** (`config/broadcasting.php`):
+```php
+return [
+    'default' => env('BROADCAST_DRIVER', 'reverb'),
+
+    'connections' => [
+        'reverb' => [
+            'driver' => 'reverb',
+            'host' => env('REVERB_HOST', '127.0.0.1'),
+            'port' => env('REVERB_PORT', 8080),
+            'scheme' => env('REVERB_SCHEME', 'http'),
+            'app_id' => env('REVERB_APP_ID'),
+            'app_key' => env('REVERB_APP_KEY'),
+            'app_secret' => env('REVERB_APP_SECRET'),
+        ],
+    ],
+];
+```
+
+**Environment Variables**:
+```
+BROADCAST_DRIVER=reverb
+REVERB_HOST=127.0.0.1
+REVERB_PORT=8080
+REVERB_SCHEME=http
+REVERB_APP_ID=typhoon
+REVERB_APP_KEY=your-app-key
+REVERB_APP_SECRET=your-app-secret
+```
+
+### 22.2 Broadcasting Channels
+
+Define channels in `routes/channels.php`:
+
+```php
+// Public channel (no auth required)
+Broadcast::channel('exchange-rates', function () {
+    return true;
+});
+
+// Private channel (auth required)
+Broadcast::channel('account.{accountId}', function (User $user, $accountId) {
+    $account = Account::find($accountId);
+    return $user->id === $account->user_id;
+});
+
+// Presence channel (with user info)
+Broadcast::channel('notifications.{userId}', function (User $user, $userId) {
+    if ((int)$userId === $user->id) {
+        return ['id' => $user->id, 'name' => $user->name];
+    }
+});
+```
+
+### 22.3 Broadcasting Events from Models
+
+Create ShouldBroadcast events:
+
+```php
+// app/Events/TransactionCreated.php
+class TransactionCreated implements ShouldBroadcast
+{
+    use Dispatchable, InteractsWithSockets, SerializesModels;
+
+    public function __construct(public Transaction $transaction) {}
+
+    public function broadcastOn(): array
+    {
+        return [
+            new PrivateChannel("account.{$this->transaction->debit_account_id}"),
+            new PrivateChannel("account.{$this->transaction->credit_account_id}"),
+        ];
+    }
+
+    public function broadcastAs(): string
+    {
+        return 'transaction.created';
+    }
+
+    public function broadcastWith(): array
+    {
+        return [
+            'id' => $this->transaction->id,
+            'reference' => $this->transaction->reference,
+            'amount' => $this->transaction->amount,
+            'status' => $this->transaction->status,
+            'created_at' => $this->transaction->created_at,
+        ];
+    }
+}
+
+// Dispatch after transaction created
+TransactionCreated::dispatch($transaction);
+```
+
+### 22.4 Client-Side Echo Listeners (React)
+
+```tsx
+// resources/js/hooks/useTransactionUpdates.ts
+import { useEffect, useState } from 'react';
+import Echo from 'laravel-echo';
+
+export function useTransactionUpdates(accountId) {
+    const [transaction, setTransaction] = useState(null);
+
+    useEffect(() => {
+        // Subscribe to private channel
+        window.Echo.private(`account.${accountId}`)
+            .listen('.transaction.created', (data) => {
+                setTransaction(data);
+                // Update UI with new transaction
+            })
+            .listen('.transaction.updated', (data) => {
+                setTransaction(data);
+            });
+
+        return () => {
+            window.Echo.leaveChannel(`account.${accountId}`);
+        };
+    }, [accountId]);
+
+    return transaction;
+}
+```
+
+### 22.5 Running Reverb Server
+
+```bash
+# Development
+php artisan reverb:start
+
+# Production (with supervisord)
+php artisan reverb:start --host=0.0.0.0 --port=8080 --debug
+```
+
+---
+
+## 23. Code Examples & Patterns
+
+### 23.1 Eloquent Model Relationships
+
+**One-to-Many Example:**
+```php
+// app/Models/User.php
+class User extends Model
+{
+    public function accounts()
+    {
+        return $this->hasMany(Account::class);
+    }
+
+    public function transactions()
+    {
+        return $this->hasMany(Transaction::class);
+    }
+
+    public function kycVerification()
+    {
+        return $this->hasOne(KycVerification::class);
+    }
+}
+
+// Usage
+$user = User::with('accounts', 'transactions')->find($id);
+$user->accounts;           // All accounts
+$user->accounts()->sum('balance');  // Total balance
+```
+
+**Many-to-Many Example:**
+```php
+// app/Models/Role.php
+class Role extends Model
+{
+    public function users()
+    {
+        return $this->belongsToMany(User::class);
+    }
+
+    public function permissions()
+    {
+        return $this->belongsToMany(Permission::class);
+    }
+}
+
+// Attach role to user
+$user->roles()->attach($roleId);
+
+// Check if user has role
+$user->hasRole('admin');
+```
+
+**Polymorphic Relationships:**
+```php
+// app/Models/AuditLog.php
+class AuditLog extends Model
+{
+    public function auditable()
+    {
+        return $this->morphTo();  // Can audit User, Transaction, Account, etc.
+    }
+}
+
+// Log transaction
+AuditLog::create([
+    'auditable_type' => Transaction::class,
+    'auditable_id' => $transaction->id,
+    'action' => 'created',
+    'user_id' => auth()->id(),
+]);
+
+// Retrieve
+$audit = AuditLog::find($id);
+$audit->auditable;  // Returns the Transaction/User/etc
+```
+
+### 23.2 Authorization Policies
+
+**Create Policy:**
+```bash
+php artisan make:policy TransactionPolicy --model=Transaction
+```
+
+**Policy File:**
+```php
+// app/Policies/TransactionPolicy.php
+class TransactionPolicy
+{
+    public function view(User $user, Transaction $transaction)
+    {
+        return $user->id === $transaction->user_id ||
+               $transaction->debit_account->user_id === $user->id ||
+               $transaction->credit_account->user_id === $user->id;
+    }
+
+    public function reverse(User $user, Transaction $transaction)
+    {
+        return $user->hasPermissionTo('transaction:reverse') &&
+               $transaction->status === 'completed' &&
+               now()->diffInHours($transaction->created_at) < 24;
+    }
+}
+
+// Register policy
+protected $policies = [
+    Transaction::class => TransactionPolicy::class,
+];
+```
+
+**Using Policy:**
+```php
+// In controller
+$this->authorize('view', $transaction);
+$this->authorize('reverse', $transaction);
+
+// In Blade
+@can('reverse', $transaction)
+    <button>Reverse Transaction</button>
+@endcan
+
+// In API
+if ($user->cannot('view', $transaction)) {
+    abort(403);
+}
+```
+
+### 23.3 Middleware Implementation
+
+**Create Middleware:**
+```bash
+php artisan make:middleware CheckKycLevel
+```
+
+**Middleware Code:**
+```php
+// app/Http/Middleware/CheckKycLevel.php
+class CheckKycLevel
+{
+    public function handle(Request $request, Closure $next, $level = '1')
+    {
+        $user = $request->user();
+
+        if (!$user || $user->kyc_level < (int)$level) {
+            return response()->json(['message' => 'KYC verification required'], 403);
+        }
+
+        return $next($request);
+    }
+}
+
+// Register in Kernel
+protected $routeMiddleware = [
+    'kyc' => CheckKycLevel::class,
+];
+
+// Use in routes
+Route::post('/crypto/withdraw', [CryptoController::class, 'withdraw'])
+    ->middleware('auth:sanctum', 'kyc:2');
+```
+
+### 23.4 Custom Jobs
+
+**Create Job:**
+```bash
+php artisan make:job ConfirmCryptoDeposit
+```
+
+**Job Implementation:**
+```php
+// app/Jobs/ConfirmCryptoDeposit.php
+class ConfirmCryptoDeposit implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public function __construct(
+        public CryptoDeposit $deposit,
+        public int $confirmations = 3
+    ) {}
+
+    public function handle(BlockchainService $blockchain)
+    {
+        $status = $blockchain->getTransactionStatus($this->deposit->tx_hash);
+
+        if ($status['confirmations'] >= $this->confirmations) {
+            // Credit wallet
+            $wallet = CryptoWallet::where('address', $this->deposit->to_address)->first();
+            $wallet->increment('balance', $this->deposit->amount);
+
+            // Update deposit status
+            $this->deposit->update(['status' => 'confirmed']);
+
+            // Notify user
+            Notification::send(
+                $wallet->user,
+                new CryptoDepositConfirmed($this->deposit)
+            );
+        } else {
+            // Retry in 1 minute
+            $this->release(60);
+        }
+    }
+}
+
+// Dispatch
+ConfirmCryptoDeposit::dispatch($deposit);
+```
+
+### 23.5 Service Class Pattern
+
+```php
+// app/Services/CryptoExchangeService.php
+class CryptoExchangeService
+{
+    public function __construct(
+        private BlockchainService $blockchain,
+        private FeeScheduleService $fees,
+    ) {}
+
+    public function placeOrder(User $user, array $data): CryptoOrder
+    {
+        return DB::transaction(function () use ($user, $data) {
+            $rate = ExchangeRate::where('base_currency', $data['base_currency'])
+                ->where('quote_currency', $data['quote_currency'])
+                ->firstOrFail();
+
+            $price = $data['side'] === 'buy' ? $rate->ask : $rate->bid;
+            $fee = $this->fees->calculateFee('crypto_trade', $data['amount']);
+
+            $order = CryptoOrder::create([
+                'order_number' => $this->generateOrderNumber(),
+                'user_id' => $user->id,
+                'side' => $data['side'],
+                'base_currency' => $data['base_currency'],
+                'quote_currency' => $data['quote_currency'],
+                'amount' => $data['amount'],
+                'price' => $price,
+                'fee' => $fee,
+                'status' => 'pending',
+            ]);
+
+            if ($data['side'] === 'buy') {
+                $this->executeMarketBuy($user, $order);
+            }
+
+            return $order;
+        });
+    }
+
+    private function executeMarketBuy(User $user, CryptoOrder $order): void
+    {
+        // Execute buy logic
+        $wallet = $user->cryptoWallets()
+            ->where('crypto_currency_code', $order->base_currency)
+            ->firstOrCreate();
+
+        $totalCost = $order->amount * $order->price + $order->fee;
+        $account = $user->accounts()->where('currency', $order->quote_currency)->first();
+
+        if ($account->balance < $totalCost) {
+            throw new InsufficientFundsException();
+        }
+
+        $account->decrement('balance', $totalCost);
+        $wallet->increment('balance', $order->amount);
+        $order->update(['status' => 'completed']);
+
+        TransactionCreated::dispatch(/* ... */);
+    }
+
+    private function generateOrderNumber(): string
+    {
+        return 'ORD-' . time() . '-' . random_int(1000, 9999);
+    }
+}
+```
+
+---
+
+## 24. Advanced Operations & DevOps
+
+### 24.1 Backup & Disaster Recovery
+
+**Automated Database Backups:**
+```bash
+# Laravel Backup package
+composer require spatie/laravel-backup
+
+# Schedule in Kernel.php
+$schedule->command('backup:run')->daily()->at('02:00');
+$schedule->command('backup:monitor')->hourly();
+```
+
+**Manual Backup:**
+```bash
+# Full backup
+php artisan backup:run
+
+# Backup specific disk
+php artisan backup:run --only-db
+
+# Restore from backup
+php artisan backup:restore
+```
+
+### 24.2 Docker Containerization
+
+**Dockerfile:**
+```dockerfile
+FROM php:8.3-fpm
+
+RUN apt-get update && apt-get install -y \
+    git curl zip unzip \
+    postgresql-client \
+    && docker-php-ext-install pdo pdo_pgsql
+
+WORKDIR /var/www/typhoon
+
+COPY composer.json composer.lock ./
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+RUN composer install
+
+COPY . .
+
+CMD ["php-fpm"]
+```
+
+**Docker Compose:**
+```yaml
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: typhoon-app
+    volumes:
+      - .:/var/www/typhoon
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: postgres:15
+    container_name: typhoon-db
+    environment:
+      POSTGRES_DB: typhoon
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: typhoon-redis
+
+  nginx:
+    image: nginx:alpine
+    container_name: typhoon-nginx
+    ports:
+      - "8000:80"
+    volumes:
+      - .:/var/www/typhoon
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - app
+
+volumes:
+  postgres_data:
+```
+
+**Running Docker:**
+```bash
+docker-compose up -d
+docker-compose exec app php artisan migrate
+docker-compose exec app php artisan db:seed
+```
+
+### 24.3 CI/CD Pipeline (GitHub Actions)
+
+**.github/workflows/tests.yml:**
+```yaml
+name: Tests
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: typhoon_test
+          POSTGRES_PASSWORD: secret
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_pgsql, redis
+      
+      - name: Install Dependencies
+        run: composer install --no-interaction
+      
+      - name: Create .env
+        run: cp .env.example .env && php artisan key:generate
+      
+      - name: Run Tests
+        run: php artisan test
+        env:
+          DB_HOST: localhost
+          DB_DATABASE: typhoon_test
+```
+
+### 24.4 Monitoring & Observability
+
+**Application Performance Monitoring (APM):**
+```php
+// config/monitoring.php
+return [
+    'apm_driver' => env('APM_DRIVER', 'null'),  // newrelic, datadog, elastic
+
+    'newrelic' => [
+        'app_name' => env('NEWRELIC_APP_NAME'),
+        'license_key' => env('NEWRELIC_LICENSE_KEY'),
+    ],
+
+    'datadog' => [
+        'api_key' => env('DATADOG_API_KEY'),
+        'app_key' => env('DATADOG_APP_KEY'),
+        'site' => 'datadoghq.com',
+    ],
+];
+```
+
+**Health Check Endpoint:**
+```php
+// routes/api.php
+Route::get('/health', function () {
+    $checks = [
+        'database' => DB::connection()->getPdo() ? 'ok' : 'fail',
+        'redis' => Cache::store('redis')->get('test') === false ? 'fail' : 'ok',
+        'queue' => queue_jobs_pending() < 100 ? 'ok' : 'warning',
+    ];
+
+    return response()->json($checks, 200);
+});
+
+// Kubernetes liveness probe
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8000
+  initialDelaySeconds: 30
+  periodSeconds: 10
+```
+
+### 24.5 Scaling Considerations
+
+**Horizontal Scaling (Load Balancing):**
+```bash
+# Use sticky sessions for Inertia
+Session::put('FORCE_SESSION_SAVE', true);
+```
+
+**Database Read Replicas:**
+```php
+// config/database.php
+'connections' => [
+    'pgsql' => [
+        'driver' => 'pgsql',
+        'write' => ['host' => 'primary.db.local'],
+        'read' => [
+            ['host' => 'replica1.db.local'],
+            ['host' => 'replica2.db.local'],
+        ],
+    ],
+];
+```
+
+**Cache Warm-up:**
+```php
+// Artisan command
+php artisan cache:warmup
+
+// Implementation
+public function handle()
+{
+    Cache::remember('exchange_rates', 3600, fn() => ExchangeRate::all());
+    Cache::remember('fee_schedules', 3600, fn() => FeeSchedule::all());
+    Cache::remember('currencies', 3600, fn() => CryptoCurrency::all());
+}
+```
+
+---
+
+## 25. Frontend Architecture
+
+### 25.1 Component Folder Structure
+
+```
+resources/js/
+├── components/
+│   ├── ui/                    # Radix UI + Tailwind wrapped components
+│   │   ├── button.tsx
+│   │   ├── card.tsx
+│   │   ├── input.tsx
+│   │   ├── select.tsx
+│   │   ├── dialog.tsx
+│   │   ├── table.tsx
+│   │   └── spinner.tsx
+│   ├── layout/                # Layout wrappers
+│   │   ├── app-layout.tsx
+│   │   ├── auth-layout.tsx
+│   │   ├── app-header.tsx
+│   │   └── app-sidebar.tsx
+│   ├── forms/                 # Form components
+│   │   ├── transfer-form.tsx
+│   │   ├── kyc-form.tsx
+│   │   └── account-form.tsx
+│   ├── tables/                # Data tables
+│   │   ├── transactions-table.tsx
+│   │   └── accounts-table.tsx
+│   └── shared/                # Reusable utilities
+│       ├── empty-state.tsx
+│       └── breadcrumbs.tsx
+├── pages/
+│   ├── banking/
+│   │   ├── dashboard.tsx
+│   │   ├── accounts.tsx
+│   │   └── crypto.tsx
+│   ├── admin/
+│   │   └── dashboard.tsx
+│   └── welcome.tsx
+├── hooks/
+│   ├── use-auth.ts
+│   ├── use-balance.ts
+│   ├── use-transaction-updates.ts
+│   └── use-pagination.ts
+├── lib/
+│   ├── utils.ts               # Utility functions
+│   ├── api-client.ts          # API wrapper
+│   └── constants.ts
+└── app.tsx                    # Root app component
+```
+
+### 25.2 State Management Patterns
+
+**Custom Hook for Auth:**
+```tsx
+// resources/js/hooks/use-auth.ts
+import { usePage } from '@inertiajs/react';
+
+export function useAuth() {
+    const { auth } = usePage().props;
+    
+    return {
+        user: auth?.user,
+        isAuthenticated: !!auth?.user,
+        isAdmin: auth?.user?.roles?.includes('admin'),
+        can: (permission: string) => 
+            auth?.user?.permissions?.includes(permission),
+    };
+}
+
+// Usage
+function AdminPanel() {
+    const { isAdmin, can } = useAuth();
+    
+    if (!isAdmin) return null;
+    
+    return (
+        <>
+            {can('kyc:approve') && <KycButton />}
+        </>
+    );
+}
+```
+
+**Form State Management:**
+```tsx
+// Using Inertia's useForm
+import { useForm } from '@inertiajs/react';
+
+export function TransferForm() {
+    const { data, setData, post, processing } = useForm({
+        from_account_id: '',
+        to_account_id: '',
+        amount: '',
+        description: '',
+    });
+
+    const submit = (e) => {
+        e.preventDefault();
+        post('/banking/transfer');
+    };
+
+    return (
+        <form onSubmit={submit}>
+            <input
+                value={data.from_account_id}
+                onChange={(e) => setData('from_account_id', e.target.value)}
+            />
+            <button disabled={processing}>Transfer</button>
+        </form>
+    );
+}
+```
+
+### 25.3 Error Boundary
+
+```tsx
+// resources/js/components/error-boundary.tsx
+import { Component, ReactNode } from 'react';
+
+interface Props {
+    children: ReactNode;
+}
+
+interface State {
+    hasError: boolean;
+    error?: Error;
+}
+
+export class ErrorBoundary extends Component<Props, State> {
+    constructor(props: Props) {
+        super(props);
+        this.state = { hasError: false };
+    }
+
+    static getDerivedStateFromError(error: Error): State {
+        return { hasError: true, error };
+    }
+
+    componentDidCatch(error: Error) {
+        console.error('Error caught:', error);
+    }
+
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="p-4 text-red-600">
+                    <h2>Something went wrong</h2>
+                    <p>{this.state.error?.message}</p>
+                </div>
+            );
+        }
+
+        return this.props.children;
+    }
+}
+```
+
+---
+
+## 26. Domain-Specific Implementation Details
+
+### 26.1 IBAN Generation per Country
+
+**IBAN Structure:**
+```php
+// app/Services/IbanService.php
+class IbanService
+{
+    private const IBAN_LENGTHS = [
+        'DE' => 22, 'FR' => 27, 'ES' => 24, 'IT' => 27,
+        'NL' => 18, 'BE' => 16, 'CH' => 21, 'AT' => 20,
+    ];
+
+    public function generate(string $countryCode, int $accountNumber): string
+    {
+        $length = self::IBAN_LENGTHS[$countryCode] ?? null;
+        if (!$length) throw new InvalidCountryException();
+
+        $checksum = $this->calculateChecksum($countryCode);
+        $bban = $this->generateBban($countryCode, $accountNumber);
+
+        return $countryCode . $checksum . $bban;
+    }
+
+    private function calculateChecksum(string $countryCode): string
+    {
+        $numeric = substr($countryCode, 0, 2);
+        $rearranged = substr($numeric, 2) . $numeric . '00';
+        
+        $mod = 0;
+        foreach (str_split($rearranged) as $digit) {
+            $mod = ($mod * 10 + (int)$digit) % 97;
+        }
+
+        return str_pad(98 - $mod, 2, '0', STR_PAD_LEFT);
+    }
+
+    private function generateBban(string $country, int $accountNumber): string
+    {
+        return match($country) {
+            'DE' => '80070024' . str_pad($accountNumber, 14, '0', STR_PAD_LEFT),
+            'FR' => '20041010050500013M02606' . str_pad($accountNumber, 2, '0', STR_PAD_LEFT),
+            // ... other countries
+        };
+    }
+}
+```
+
+### 26.2 Fee Calculation Engine
+
+**Tiered Fee Logic:**
+```php
+// app/Services/FeeService.php
+class FeeService
+{
+    public function calculateFee(string $type, float $amount, User $user = null): float
+    {
+        $schedule = FeeSchedule::where('fee_type', $type)->first();
+
+        if (!$schedule) return 0;
+
+        return match($schedule->calculation_method) {
+            'fixed' => $schedule->fee_value,
+            'percentage' => ($amount * $schedule->fee_value) / 100,
+            'tiered' => $this->calculateTieredFee($amount, $schedule->tiers),
+            'progressive' => $this->calculateProgressiveFee($amount, $user, $schedule),
+        };
+    }
+
+    private function calculateTieredFee(float $amount, array $tiers): float
+    {
+        foreach ($tiers as $tier) {
+            if ($amount >= $tier['min'] && $amount <= $tier['max']) {
+                return ($amount * $tier['rate']) / 100;
+            }
+        }
+        return 0;
+    }
+
+    private function calculateProgressiveFee(float $amount, User $user, FeeSchedule $schedule): float
+    {
+        $monthlyVolume = $user->transactions()
+            ->whereMonth('created_at', now()->month)
+            ->sum('amount');
+
+        if ($monthlyVolume > $schedule->volume_threshold) {
+            return ($amount * $schedule->premium_rate) / 100;
+        }
+
+        return ($amount * $schedule->standard_rate) / 100;
+    }
+}
+```
+
+### 26.3 Compliance Rule Engine
+
+**Rule Matching:**
+```php
+// app/Services/ComplianceEngine.php
+class ComplianceEngine
+{
+    public function evaluateTransaction(Transaction $transaction): array
+    {
+        $alerts = [];
+        $rules = MonitoringRule::where('active', true)->get();
+
+        foreach ($rules as $rule) {
+            if ($this->matchesRule($transaction, $rule)) {
+                $alerts[] = MonitoringAlert::create([
+                    'monitoring_rule_id' => $rule->id,
+                    'transaction_id' => $transaction->id,
+                    'user_id' => $transaction->user_id,
+                    'severity' => $rule->severity,
+                    'status' => 'open',
+                ]);
+            }
+        }
+
+        return $alerts;
+    }
+
+    private function matchesRule(Transaction $transaction, MonitoringRule $rule): bool
+    {
+        $conditions = json_decode($rule->conditions, true);
+
+        foreach ($conditions as $field => $operator => $value) {
+            $txValue = data_get($transaction, $field);
+
+            if (!$this->evaluateCondition($txValue, $operator, $value)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function evaluateCondition($value, string $operator, $expected): bool
+    {
+        return match($operator) {
+            '=' => $value === $expected,
+            '>' => $value > $expected,
+            '<' => $value < $expected,
+            'in' => in_array($value, (array)$expected),
+            'contains' => str_contains($value, $expected),
+        };
+    }
+}
+
+// Example rule structure
+$rule = MonitoringRule::create([
+    'name' => 'Unusual Transfer Amount',
+    'conditions' => json_encode([
+        'amount' => ['>' => 100000],
+        'type' => ['in' => ['sepa', 'swift']],
+    ]),
+    'severity' => 'high',
+]);
+```
+
+### 26.4 Wallet Seed Phrase Management
+
+**Secure Storage:**
+```php
+// app/Services/BlockchainService.php
+class BlockchainService
+{
+    public function generateAddress(): array
+    {
+        // Generate keypair using web3.php
+        $account = $this->web3->personal()->newAccount('password');
+
+        // Encrypt private key before storing
+        $encrypted = Crypt::encryptString($account['privateKey']);
+
+        // Store separately from address
+        $wallet = CryptoWallet::create([
+            'address' => $account['address'],
+            'encrypted_private_key' => $encrypted,
+            'created_at' => now(),
+        ]);
+
+        return [
+            'address' => $account['address'],
+            'privateKey' => $account['privateKey'],  // Return only once to user
+        ];
+    }
+
+    public function sendTransaction(string $toAddress, string $amount): string
+    {
+        // Decrypt private key only when needed
+        $account = Auth::user()->cryptoWallet;
+        $privateKey = Crypt::decryptString($account->encrypted_private_key);
+
+        // Sign and send transaction
+        $txHash = $this->web3->eth()->sendTransaction([
+            'from' => $account->address,
+            'to' => $toAddress,
+            'value' => $this->web3->utils()->toWei($amount, 'ether'),
+            'gas' => 21000,
+            'gasPrice' => $this->web3->eth()->gasPrice(),
+        ], $privateKey);
+
+        return $txHash;
+    }
+}
+```
+
+### 26.5 Loan Underwriting Workflow
+
+**Multi-Stage Approval:**
+```php
+// app/Services/LoanService.php
+class LoanService
+{
+    public function apply(User $user, array $data): Loan
+    {
+        $score = $this->calculateCreditScore($user);
+        $amount = $data['amount'];
+        $autoApprove = $score > 700 && $amount < 50000;
+
+        $loan = Loan::create([
+            'user_id' => $user->id,
+            'account_id' => $data['account_id'],
+            'loan_number' => 'LOAN-' . time(),
+            'amount' => $amount,
+            'interest_rate' => $this->getInterestRate($score),
+            'term_months' => $data['term_months'],
+            'status' => $autoApprove ? 'approved' : 'pending_review',
+            'credit_score' => $score,
+        ]);
+
+        if ($autoApprove) {
+            $this->disburse($loan);
+        }
+
+        return $loan;
+    }
+
+    private function calculateCreditScore(User $user): int
+    {
+        $score = 500;  // Base score
+
+        // Payment history (30%)
+        $missed = $user->loanRepayments()
+            ->where('status', 'defaulted')
+            ->count();
+        $score -= $missed * 50;
+
+        // Account age (10%)
+        $months = $user->created_at->diffInMonths(now());
+        $score += min($months, 60);
+
+        // KYC level (20%)
+        $score += ($user->kyc_level * 100);
+
+        // Transaction volume (20%)
+        $volume = $user->transactions()->sum('amount');
+        $score += min($volume / 1000, 200);
+
+        return max(0, min(850, $score));
+    }
+
+    private function getInterestRate(int $creditScore): float
+    {
+        return match(true) {
+            $creditScore >= 750 => 3.5,
+            $creditScore >= 700 => 5.0,
+            $creditScore >= 650 => 7.5,
+            $creditScore >= 600 => 10.0,
+            default => 15.0,
+        };
+    }
+}
+```
+
+---
+
+## 27. Operations & Maintenance
+
+### 27.1 Log Rotation & Cleanup
+
+**Configuration** (`.env`):
+```
+LOG_CHANNEL=daily
+LOG_LEVEL=info
+LOG_DAILY_DAYS=30
+```
+
+**Automated Cleanup:**
+```bash
+# Schedule in Kernel.php
+$schedule->command('logs:clear')->monthly();
+$schedule->command('cache:clear')->daily();
+$schedule->command('queue:flush')->daily();
+```
+
+### 27.2 Database Backup Scheduling
+
+**Using Spatie Backup:**
+```bash
+# Schedule in Kernel.php
+$schedule->command('backup:run')->daily()->at('02:00');
+$schedule->command('backup:clean')->daily()->at('03:00');
+$schedule->command('backup:monitor')->everyFiveMinutes();
+```
+
+**Monitoring Backups:**
+```php
+// config/backup.php
+return [
+    'backup' => [
+        'source' => [
+            'databases' => ['pgsql'],
+            'files' => ['storage/app/kyc-documents'],
+        ],
+        'destination' => [
+            'disks' => ['s3-backup', 'local-backup'],
+        ],
+    ],
+
+    'cleanup' => [
+        'defaultStrategy' => 'deleteOldestBackups',
+        'strategies' => [
+            'deleteOldestBackups' => [
+                'deleteWhenUsingMoreThanGigabytes' => 100,
+            ],
+        ],
+    ],
+
+    'notifications' => [
+        'notifications' => [
+            Notification::class,
+        ],
+        'notificationChannels' => ['mail', 'slack'],
+        'events' => [
+            'backupHasFailed' => true,
+            'unhealthyBackupWasFound' => true,
+            'backupWasSuccessful' => false,
+        ],
+    ],
+];
+```
+
+### 27.3 Session & Token Cleanup
+
+```php
+// Artisan command
+php artisan session:cleanup
+php artisan sanctum:prune-expired
+
+// Schedule
+$schedule->command('session:cleanup')->daily();
+$schedule->command('sanctum:prune-expired --hours=24')->daily();
+```
+
+### 27.4 Cache Warming
+
+```php
+// app/Console/Commands/WarmCache.php
+class WarmCache extends Command
+{
+    public function handle()
+    {
+        // Warm exchange rates
+        Cache::remember('exchange_rates', 3600, fn() => 
+            ExchangeRate::latest('last_refreshed_at')->get()
+        );
+
+        // Warm fee schedules
+        Cache::remember('fee_schedules', 86400, fn() =>
+            FeeSchedule::where('active', true)->get()
+        );
+
+        // Warm platform settings
+        Cache::remember('platform_settings', 86400, fn() =>
+            PlatformSetting::all()
+        );
+
+        $this->info('Cache warmed successfully');
+    }
+}
+
+// Schedule
+$schedule->command('cache:warm')->hourly();
+$schedule->command('cache:warm')->dailyAt('00:00');
+```
+
+### 27.5 Performance Metrics & Alerts
+
+**Key Metrics to Monitor:**
+```
+- Request latency (p50, p95, p99)
+- Error rate (4xx, 5xx)
+- Database query time
+- Cache hit rate
+- Queue backlog size
+- Active transactions/min
+- API response time
+```
+
+**Alert Thresholds:**
+```
+- Error rate > 1% → Critical
+- Request latency > 2s (p95) → Warning
+- Queue backlog > 1000 jobs → Warning
+- Database connections > 80% → Warning
+- Disk usage > 85% → Warning
+```
+
+---
+
 ## Complete Development Checklist
 
 ### Before Deploying to Production:

@@ -283,25 +283,104 @@ class BankingController extends Controller
         if ($request->isMethod('post')) {
             $validated = $request->validate([
                 'country' => 'required|string|size:2',
+                'nationality' => 'required|string',
                 'date_of_birth' => 'required|date|before:today',
-                'id_type' => 'nullable|string',
-                'id_number' => 'nullable|string',
-                'address_line1' => 'nullable|string|max:255',
-                'city' => 'nullable|string|max:255',
+                'id_type' => 'required|string|in:passport,national_id,drivers_license',
+                'id_number' => 'required|string|max:100',
+                'id_expiry_date' => 'nullable|date|after:today',
+                'address_line1' => 'required|string|max:255',
+                'address_line2' => 'nullable|string|max:255',
+                'city' => 'required|string|max:100',
+                'state' => 'nullable|string|max:100',
+                'postal_code' => 'required|string|max:20',
+                'source_of_funds' => 'nullable|string|in:employment,business,investment,inheritance,savings,other',
+                'occupation' => 'nullable|string|max:100',
+                'employer' => 'nullable|string|max:100',
+                'annual_income_range' => 'nullable|string',
+                'identity_document' => 'nullable|file|mimes:pdf,jpeg,png,webp|max:10240',
+                'proof_of_address' => 'nullable|file|mimes:pdf,jpeg,png,webp|max:10240',
+                'proof_of_income' => 'nullable|file|mimes:pdf,jpeg,png,webp|max:10240',
             ]);
 
             try {
-                $this->kycService->submitVerification($request->user(), $validated);
-                return redirect()->back()->with('success', 'KYC submitted successfully');
+                // Submit KYC verification data
+                $verification = $this->kycService->submitVerification($request->user(), $validated);
+
+                // Handle document uploads
+                $documentMapping = [
+                    'identity_document' => 'identity_document',
+                    'proof_of_address' => 'proof_of_address',
+                    'proof_of_income' => 'proof_of_income',
+                ];
+
+                foreach ($documentMapping as $requestKey => $docType) {
+                    if ($request->hasFile($requestKey)) {
+                        $this->kycService->uploadDocument(
+                            $verification,
+                            ['file' => $request->file($requestKey)],
+                            $docType
+                        );
+                    }
+                }
+
+                return redirect()->back()->with('success', 'KYC submitted successfully. We will review your submission within 1-2 business days.');
             } catch (\Exception $e) {
-                return back()->withErrors(['country' => $e->getMessage()]);
+                return back()->withErrors(['error' => $e->getMessage()]);
             }
         }
 
-        $kycStatus = $this->kycService->getVerificationStatus($request->user());
+        $user = $request->user();
+        $kycStatus = $this->kycService->getVerificationStatus($user);
+        $kyc_documents = $user->kycVerification?->documents()->get() ?? [];
 
         return Inertia::render('banking/kyc', [
             'kyc_status' => $kycStatus,
+            'kyc_documents' => $kyc_documents,
+        ]);
+    }
+
+    public function kycStatus(Request $request)
+    {
+        $user = $request->user();
+        $verification = $user->kycVerification;
+
+        if (!$verification) {
+            return Inertia::render('banking/kyc-status', [
+                'kyc_data' => [
+                    'status' => 'not_submitted',
+                    'kyc_level' => 'none',
+                    'submitted' => false,
+                    'documents' => [],
+                ],
+            ]);
+        }
+
+        return Inertia::render('banking/kyc-status', [
+            'kyc_data' => [
+                'status' => $verification->status,
+                'kyc_level' => $verification->kyc_level,
+                'submitted' => true,
+                'submitted_at' => $verification->created_at,
+                'verified_at' => $verification->verified_at,
+                'rejection_reason' => $verification->rejection_reason,
+                'documents' => $verification->documents()->get()->map(fn($doc) => [
+                    'id' => $doc->id,
+                    'document_type' => $doc->document_type,
+                    'status' => $doc->status,
+                    'created_at' => $doc->created_at,
+                ]),
+                'verification_details' => [
+                    'country' => $verification->country,
+                    'nationality' => $verification->nationality,
+                    'date_of_birth' => $verification->date_of_birth,
+                    'id_type' => $verification->id_type,
+                    'id_number' => $verification->id_number,
+                    'address' => $verification->address_line1 . ($verification->address_line2 ? ' ' . $verification->address_line2 : ''),
+                    'city' => $verification->city,
+                    'postal_code' => $verification->postal_code,
+                    'occupation' => $verification->occupation,
+                ],
+            ],
         ]);
     }
 

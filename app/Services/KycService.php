@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Events\KycStatusChanged;
 use App\Models\Banking\KycDocument;
 use App\Models\Banking\KycVerification;
 use App\Models\User;
@@ -67,17 +68,25 @@ class KycService
             ]);
 
             $verification->documents()->update(['status' => 'approved']);
+            
+            // Broadcast the status change
+            KycStatusChanged::dispatch($verification);
         });
     }
 
     public function rejectVerification(KycVerification $verification, User $admin, string $reason): void
     {
-        $verification->update([
-            'status' => 'rejected',
-            'rejection_reason' => $reason,
-            'verified_at' => now(),
-            'verified_by' => $admin->id,
-        ]);
+        DB::transaction(function () use ($verification, $admin, $reason) {
+            $verification->update([
+                'status' => 'rejected',
+                'rejection_reason' => $reason,
+                'verified_at' => now(),
+                'verified_by' => $admin->id,
+            ]);
+            
+            // Broadcast the status change
+            KycStatusChanged::dispatch($verification);
+        });
     }
 
     public function getVerificationStatus(User $user): array
