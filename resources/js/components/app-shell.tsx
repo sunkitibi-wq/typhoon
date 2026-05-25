@@ -9,7 +9,9 @@ type Props = {
 };
 
 export function AppShell({ children, variant = 'sidebar' }: Props) {
-    const isOpen = usePage().props.sidebarOpen;
+    const { url, props } = usePage();
+    const isOpen = props.sidebarOpen;
+    const isAdminArea = url.startsWith('/admin');
 
     if (variant === 'header') {
         return (
@@ -17,5 +19,9 @@ export function AppShell({ children, variant = 'sidebar' }: Props) {
         );
     }
 
-    return <SidebarProvider defaultOpen={isOpen}>{children}</SidebarProvider>;
+    return (
+        <SidebarProvider defaultOpen={isOpen} className={isAdminArea ? 'dark admin-theme' : ''}>
+            {children}
+        </SidebarProvider>
+    );
 }

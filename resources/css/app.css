@@ -141,3 +141,29 @@
         @apply bg-background text-foreground;
     }
 }
+
+.admin-theme {
+    --background: #020617;
+    --foreground: oklch(0.985 0 0);
+    --card: rgba(15, 23, 42, 0.95);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: #090d16;
+    --popover-foreground: oklch(0.985 0 0);
+    --border: #1e293b;
+    --input: #1e293b;
+    --ring: #0ea5e9;
+    
+    --sidebar: #090d16;
+    --sidebar-border: #1e293b;
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-accent: rgba(56, 189, 248, 0.1);
+    --sidebar-accent-foreground: #38bdf8;
+    --sidebar-ring: #0ea5e9;
+}
+
+.admin-theme [data-slot="sidebar-inset"] {
+    background: radial-gradient(circle at top left, rgba(56,189,248,0.18), transparent 26%), 
+                radial-gradient(circle at top right, rgba(14,165,233,0.14), transparent 28%), 
+                radial-gradient(circle at bottom, rgba(15,23,42,0.95), transparent 55%), 
+                #020617 !important;
+}
