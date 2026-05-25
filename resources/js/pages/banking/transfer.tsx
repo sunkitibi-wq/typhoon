@@ -15,13 +15,39 @@ interface Account {
     currency: string;
 }
 
-export default function Transfer({ accounts }: { accounts: Account[] }) {
+interface ExchangeRate {
+    base: string;
+    quote: string;
+    rate: number;
+}
+
+const getCurrencySymbol = (currency: string) => {
+    switch (currency) {
+        case 'EUR': return '€';
+        case 'USD': return '$';
+        case 'GBP': return '£';
+        case 'CHF': return 'CHF';
+        default: return currency;
+    }
+};
+
+export default function Transfer({ accounts, exchange_rates = [] }: { accounts: Account[]; exchange_rates?: ExchangeRate[] }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         from_account_id: '',
         to_account_id: '',
         amount: '',
         description: '',
     });
+
+    const fromAccount = accounts.find(a => String(a.id) === data.from_account_id);
+    const toAccount = accounts.find(a => String(a.id) === data.to_account_id);
+    const isCrossCurrency = fromAccount && toAccount && fromAccount.currency !== toAccount.currency;
+
+    const rateItem = isCrossCurrency
+        ? exchange_rates.find(r => r.base === fromAccount.currency && r.quote === toAccount.currency)
+        : null;
+    const rate = rateItem ? rateItem.rate : null;
+    const convertedAmount = rate && data.amount ? (Number(data.amount) * rate).toFixed(2) : null;
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
@@ -52,7 +78,7 @@ export default function Transfer({ accounts }: { accounts: Account[] }) {
                                         <SelectContent>
                                             {accounts.map(a => (
                                                 <SelectItem key={a.id} value={String(a.id)}>
-                                                    {a.label} - {a.number} (&euro;{a.balance.toLocaleString()})
+                                                    {a.label} - {a.number} ({getCurrencySymbol(a.currency)}{a.balance.toLocaleString()})
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -75,7 +101,7 @@ export default function Transfer({ accounts }: { accounts: Account[] }) {
                                         <SelectContent>
                                             {accounts.map(a => (
                                                 <SelectItem key={a.id} value={String(a.id)}>
-                                                    {a.label} - {a.number}
+                                                    {a.label} - {a.number} ({a.currency})
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -84,7 +110,9 @@ export default function Transfer({ accounts }: { accounts: Account[] }) {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="amount">Amount (&euro;)</Label>
+                                    <Label htmlFor="amount">
+                                        Amount {fromAccount ? `(${getCurrencySymbol(fromAccount.currency)})` : ''}
+                                    </Label>
                                     <Input
                                         id="amount"
                                         type="number"
@@ -95,6 +123,20 @@ export default function Transfer({ accounts }: { accounts: Account[] }) {
                                         onChange={e => setData('amount', e.target.value)}
                                     />
                                     <InputError message={errors.amount} />
+                                    
+                                    {isCrossCurrency && rate && (
+                                        <div className="mt-2 rounded-md bg-sky-50 dark:bg-sky-950/20 p-3 text-xs text-sky-800 dark:text-sky-400 border border-sky-100 dark:border-sky-900/50">
+                                            <p className="font-semibold">Cross-Currency Transfer Info</p>
+                                            <p className="mt-1">
+                                                Conversion Rate: 1 {fromAccount?.currency} = {rate} {toAccount?.currency}
+                                            </p>
+                                            {convertedAmount && (
+                                                <p className="mt-1 font-bold">
+                                                    Recipient receives: {getCurrencySymbol(toAccount?.currency || '')}{Number(convertedAmount).toLocaleString()} {toAccount?.currency}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="space-y-2">

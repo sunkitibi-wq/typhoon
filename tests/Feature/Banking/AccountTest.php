@@ -81,7 +81,7 @@ class AccountTest extends TestCase
         $this->assertDatabaseHas('accounts', [
             'user_id' => $this->user->id,
             'label' => 'My New Account',
-            'status' => 'active',
+            'status' => 'pending',
         ]);
     }
 

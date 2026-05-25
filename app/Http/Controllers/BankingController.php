@@ -66,6 +66,8 @@ class BankingController extends Controller
             ->whereIn('type', ['withdrawal', 'transfer'])
             ->sum('net_amount');
 
+        $rates = ExchangeRate::all();
+
         return Inertia::render('banking/dashboard', [
             'accounts' => $accounts->map(fn($a) => [
                 'id' => $a->id,
@@ -92,6 +94,11 @@ class BankingController extends Controller
             'total_balance' => (float) $accounts->sum('balance'),
             'monthly_income' => (float) $monthlyIncome,
             'monthly_spending' => (float) $monthlySpending,
+            'exchange_rates' => $rates->map(fn($r) => [
+                'base' => $r->base_currency,
+                'quote' => $r->quote_currency,
+                'rate' => (float) $r->mid_rate,
+            ]),
         ]);
     }
 
@@ -198,13 +205,14 @@ class BankingController extends Controller
             $validated = $request->validate([
                 'account_type_code' => 'required|string|exists:account_types,code',
                 'label' => 'nullable|string|max:255',
+                'currency' => 'nullable|string|in:EUR,USD,GBP,CHF',
             ]);
 
             try {
                 $this->accountService->createAccount(
                     $request->user(),
                     $validated['account_type_code'],
-                    'EUR',
+                    $validated['currency'] ?? 'EUR',
                     $validated['label'] ?? null,
                 );
 
@@ -267,6 +275,8 @@ class BankingController extends Controller
             }
         }
 
+        $rates = ExchangeRate::all();
+
         return Inertia::render('banking/transfer', [
             'accounts' => $user->accounts()->where('status', 'active')->get()->map(fn($a) => [
                 'id' => $a->id,
@@ -274,6 +284,11 @@ class BankingController extends Controller
                 'label' => $a->label,
                 'balance' => (float) $a->balance,
                 'currency' => $a->currency,
+            ]),
+            'exchange_rates' => $rates->map(fn($r) => [
+                'base' => $r->base_currency,
+                'quote' => $r->quote_currency,
+                'rate' => (float) $r->mid_rate,
             ]),
         ]);
     }
@@ -813,11 +828,14 @@ class BankingController extends Controller
                     $validated['beneficiary_account'],
                     $validated['beneficiary_bic'],
                     $validated['beneficiary_bank_name'],
-                    $validated['amount'],
-                    $validated['remittance_info'] ?? null,
-                    $validated['beneficiary_address'] ?? null,
-                    $validated['beneficiary_bank_address'] ?? null,
-                    $validated['purpose_of_payment'] ?? null,
+                    (float) $validated['amount'],
+                    'EUR',
+                    [
+                        'remittance_info' => $validated['remittance_info'] ?? null,
+                        'beneficiary_address' => $validated['beneficiary_address'] ?? null,
+                        'beneficiary_bank_address' => $validated['beneficiary_bank_address'] ?? null,
+                        'purpose_of_payment' => $validated['purpose_of_payment'] ?? null,
+                    ]
                 );
 
                 return redirect()->route('banking.swift')->with('success', 'SWIFT transfer initiated');

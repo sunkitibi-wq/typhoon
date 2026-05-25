@@ -106,4 +106,87 @@ class AdminTest extends TestCase
 
         $response->assertForbidden();
     }
+
+    public function test_admin_can_assign_roles()
+    {
+        $roleAdmin = Role::where('name', 'admin')->first();
+
+        $response = $this->actingAs($this->admin)->post(route('admin.users.edit', $this->user->id), [
+            'name' => $this->user->name,
+            'email' => $this->user->email,
+            'role_id' => $roleAdmin->id,
+            'status' => 'active',
+        ]);
+
+        $response->assertRedirect(route('admin.users.detail', $this->user->id));
+        $this->user->refresh();
+        $this->assertEquals($roleAdmin->id, $this->user->role_id);
+    }
+
+    public function test_admin_can_freeze_user_account()
+    {
+        $account = $this->user->accounts->first();
+
+        $response = $this->actingAs($this->admin)->post(route('admin.accounts.freeze', $account->id));
+
+        $response->assertRedirect();
+        $account->refresh();
+        $this->assertEquals('frozen', $account->status);
+    }
+
+    public function test_admin_can_unfreeze_user_account()
+    {
+        $account = $this->user->accounts->first();
+        $account->update(['status' => 'frozen']);
+
+        $response = $this->actingAs($this->admin)->post(route('admin.accounts.unfreeze', $account->id));
+
+        $response->assertRedirect();
+        $account->refresh();
+        $this->assertEquals('active', $account->status);
+    }
+
+    public function test_admin_can_close_user_account()
+    {
+        $account = $this->user->accounts->first();
+
+        $response = $this->actingAs($this->admin)->post(route('admin.accounts.close', $account->id));
+
+        $response->assertRedirect();
+        $account->refresh();
+        $this->assertEquals('closed', $account->status);
+        $this->assertNotNull($account->closed_at);
+    }
+
+    public function test_admin_can_view_accounts_list()
+    {
+        $response = $this->actingAs($this->admin)->get(route('admin.accounts'));
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page->component('admin/accounts'));
+    }
+
+    public function test_admin_can_approve_account()
+    {
+        $account = $this->user->accounts->first();
+        $account->update(['status' => 'pending']);
+
+        $response = $this->actingAs($this->admin)->post(route('admin.accounts.approve', $account->id));
+
+        $response->assertRedirect();
+        $account->refresh();
+        $this->assertEquals('active', $account->status);
+    }
+
+    public function test_admin_can_reject_account()
+    {
+        $account = $this->user->accounts->first();
+        $account->update(['status' => 'pending']);
+
+        $response = $this->actingAs($this->admin)->post(route('admin.accounts.reject', $account->id));
+
+        $response->assertRedirect();
+        $account->refresh();
+        $this->assertEquals('rejected', $account->status);
+    }
 }

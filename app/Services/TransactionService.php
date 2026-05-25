@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Banking\Account;
+use App\Models\Banking\ExchangeRate;
 use App\Models\Banking\FeeSchedule;
 use App\Models\Banking\Transaction;
 use App\Models\User;
@@ -43,10 +44,26 @@ class TransactionService
                 throw new \RuntimeException('Insufficient available balance');
             }
 
+            $creditAmount = $amount;
+            $exchangeRate = 1.0;
+
+            if ($fromLocked->currency !== $toLocked->currency) {
+                $rateModel = ExchangeRate::where('base_currency', $fromLocked->currency)
+                    ->where('quote_currency', $toLocked->currency)
+                    ->first();
+
+                if (!$rateModel) {
+                    throw new \RuntimeException("Exchange rate not found for {$fromLocked->currency} to {$toLocked->currency}");
+                }
+
+                $exchangeRate = (float) $rateModel->mid_rate;
+                $creditAmount = round($amount * $exchangeRate, 2);
+            }
+
             $fromLocked->decrement('balance', $netAmount);
             $fromLocked->decrement('available_balance', $netAmount);
-            $toLocked->increment('balance', $amount);
-            $toLocked->increment('available_balance', $amount);
+            $toLocked->increment('balance', $creditAmount);
+            $toLocked->increment('available_balance', $creditAmount);
 
             $reference = $this->generateReference('TFR');
 
@@ -63,6 +80,11 @@ class TransactionService
                 'currency' => $fromLocked->currency,
                 'description' => $description ?? "Transfer to {$toLocked->account_number}",
                 'category' => 'transfer',
+                'metadata' => [
+                    'exchange_rate' => $exchangeRate,
+                    'converted_amount' => $creditAmount,
+                    'destination_currency' => $toLocked->currency,
+                ],
                 'completed_at' => now(),
             ]);
 

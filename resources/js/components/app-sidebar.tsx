@@ -137,6 +137,11 @@ const adminNavItems: NavItem[] = [
         icon: Users,
     },
     {
+        title: 'Bank Accounts',
+        href: '/admin/accounts',
+        icon: Landmark,
+    },
+    {
         title: 'Crypto Deposits',
         href: '/admin/crypto-deposits',
         icon: Database,

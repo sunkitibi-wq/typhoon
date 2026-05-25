@@ -20,7 +20,7 @@ export function AppShell({ children, variant = 'sidebar' }: Props) {
     }
 
     return (
-        <SidebarProvider defaultOpen={isOpen} className={isAdminArea ? 'dark admin-theme' : ''}>
+        <SidebarProvider defaultOpen={isOpen} className={isAdminArea ? 'admin-theme' : ''}>
             {children}
         </SidebarProvider>
     );

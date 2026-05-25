@@ -499,4 +499,62 @@ class AdminController extends Controller
 
         return Storage::disk('local')->response($document->file_path);
     }
+
+    public function freezeAccount(Account $account)
+    {
+        $account->update(['status' => 'frozen']);
+        return back()->with('success', 'Account frozen successfully');
+    }
+
+    public function unfreezeAccount(Account $account)
+    {
+        $account->update(['status' => 'active']);
+        return back()->with('success', 'Account unfrozen successfully');
+    }
+
+    public function closeAccount(Account $account)
+    {
+        $account->update(['status' => 'closed', 'closed_at' => now()]);
+        return back()->with('success', 'Account closed successfully');
+    }
+
+    public function accounts(Request $request)
+    {
+        $status = $request->input('status');
+        $search = $request->input('search');
+
+        $accounts = Account::with('user', 'accountType')
+            ->when($status, fn($q) => $q->where('status', $status))
+            ->when($search, function ($q) use ($search) {
+                $q->where('account_number', 'like', "%{$search}%")
+                    ->orWhere('iban', 'like', "%{$search}%")
+                    ->orWhereHas('user', function ($uq) use ($search) {
+                        $uq->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
+                    });
+            })
+            ->latest()
+            ->paginate(20)
+            ->withQueryString();
+
+        return Inertia::render('admin/accounts', [
+            'accounts' => $accounts,
+            'filters' => [
+                'status' => $status,
+                'search' => $search,
+            ]
+        ]);
+    }
+
+    public function approveAccount(Account $account)
+    {
+        $account->update(['status' => 'active']);
+        return back()->with('success', 'Account approved successfully');
+    }
+
+    public function rejectAccount(Account $account)
+    {
+        $account->update(['status' => 'rejected']);
+        return back()->with('success', 'Account rejected successfully');
+    }
 }

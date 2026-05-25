@@ -63,6 +63,22 @@ export default function CreateAccount({ account_types }: { account_types: Accoun
                                 </div>
 
                                 <div className="space-y-2">
+                                    <Label htmlFor="currency">Account Currency *</Label>
+                                    <Select value={data.currency} onValueChange={v => setData('currency', v)}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select currency" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="EUR">EUR (&euro;)</SelectItem>
+                                            <SelectItem value="USD">USD ($)</SelectItem>
+                                            <SelectItem value="GBP">GBP (&pound;)</SelectItem>
+                                            <SelectItem value="CHF">CHF (Fr.)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <InputError message={errors.currency} />
+                                </div>
+
+                                <div className="space-y-2">
                                     <Label htmlFor="label">Account Label</Label>
                                     <Input
                                         id="label"

@@ -143,6 +143,60 @@
 }
 
 .admin-theme {
+    --background: #f8fafc;
+    --foreground: #0f172a;
+    --card: #ffffff;
+    --card-foreground: #0f172a;
+    --popover: #ffffff;
+    --popover-foreground: #0f172a;
+    --border: #cbd5e1;
+    --input: #cbd5e1;
+    --ring: #0ea5e9;
+    
+    --sidebar: #f1f5f9;
+    --sidebar-border: #cbd5e1;
+    --sidebar-foreground: #0f172a;
+    --sidebar-accent: #e2e8f0;
+    --sidebar-accent-foreground: #0ea5e9;
+    --sidebar-ring: #0ea5e9;
+    --primary: #0ea5e9;
+    --primary-foreground: #ffffff;
+}
+
+.admin-theme [data-sidebar="sidebar"],
+.admin-theme [data-slot="sidebar-wrapper"] {
+    background-color: #f1f5f9 !important;
+}
+
+.admin-theme [data-sidebar="sidebar"] {
+    border-color: #cbd5e1 !important;
+}
+
+.admin-theme [data-slot="sidebar-menu-button"] {
+    color: #334155;
+}
+
+.admin-theme [data-slot="sidebar-menu-button"][data-active="true"] {
+    background-color: #e2e8f0 !important;
+    color: #0ea5e9 !important;
+}
+
+.admin-theme [data-slot="sidebar-inset"] {
+    background: radial-gradient(circle at top left, rgba(56,189,248,0.1), transparent 30%), 
+                radial-gradient(circle at top right, rgba(14,165,233,0.08), transparent 30%), 
+                #f8fafc !important;
+}
+
+.admin-theme [data-slot="input"],
+.admin-theme select,
+.admin-theme textarea {
+    background-color: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+}
+
+.dark.admin-theme,
+.dark .admin-theme {
     --background: #020617;
     --foreground: oklch(0.985 0 0);
     --card: rgba(15, 23, 42, 0.95);
@@ -159,11 +213,48 @@
     --sidebar-accent: rgba(56, 189, 248, 0.1);
     --sidebar-accent-foreground: #38bdf8;
     --sidebar-ring: #0ea5e9;
+    --primary: #38bdf8;
+    --primary-foreground: #020617;
 }
 
-.admin-theme [data-slot="sidebar-inset"] {
+.dark.admin-theme [data-sidebar="sidebar"],
+.dark .admin-theme [data-sidebar="sidebar"],
+.dark.admin-theme [data-slot="sidebar-wrapper"],
+.dark .admin-theme [data-slot="sidebar-wrapper"] {
+    background-color: #090d16 !important;
+}
+
+.dark.admin-theme [data-sidebar="sidebar"],
+.dark .admin-theme [data-sidebar="sidebar"] {
+    border-color: #1e293b !important;
+}
+
+.dark.admin-theme [data-slot="sidebar-menu-button"],
+.dark .admin-theme [data-slot="sidebar-menu-button"] {
+    color: oklch(0.985 0 0);
+}
+
+.dark.admin-theme [data-slot="sidebar-menu-button"][data-active="true"],
+.dark .admin-theme [data-slot="sidebar-menu-button"][data-active="true"] {
+    background-color: rgba(56, 189, 248, 0.1) !important;
+    color: #38bdf8 !important;
+}
+
+.dark.admin-theme [data-slot="sidebar-inset"],
+.dark .admin-theme [data-slot="sidebar-inset"] {
     background: radial-gradient(circle at top left, rgba(56,189,248,0.18), transparent 26%), 
                 radial-gradient(circle at top right, rgba(14,165,233,0.14), transparent 28%), 
                 radial-gradient(circle at bottom, rgba(15,23,42,0.95), transparent 55%), 
                 #020617 !important;
+}
+
+.dark.admin-theme [data-slot="input"],
+.dark .admin-theme [data-slot="input"],
+.dark.admin-theme select,
+.dark .admin-theme select,
+.dark.admin-theme textarea,
+.dark .admin-theme textarea {
+    background-color: rgba(30, 41, 59, 0.5) !important;
+    border-color: #334155 !important;
+    color: #f8fafc !important;
 }

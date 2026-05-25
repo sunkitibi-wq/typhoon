@@ -25,9 +25,9 @@ export default function AdminDashboard({ data }: { data: AdminDashboardData }) {
     return (
         <>
             <Head title="Admin Dashboard" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+            <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4 min-w-0">
                 <h2 className="text-2xl font-bold tracking-tight">Admin Overview</h2>
-                <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
                             <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -91,12 +91,12 @@ export default function AdminDashboard({ data }: { data: AdminDashboardData }) {
                     <CardContent>
                         <div className="space-y-3">
                             {data.recent_transactions.map(tx => (
-                                <div key={tx.id} className="flex items-center justify-between rounded-lg border p-3">
-                                    <div>
-                                        <p className="text-sm font-medium font-mono">{tx.reference}</p>
+                                <div key={tx.id} className="flex flex-col sm:flex-row sm:items-center justify-between rounded-lg border p-3 gap-2 sm:gap-4 min-w-0">
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium font-mono truncate">{tx.reference}</p>
                                         <p className="text-xs text-muted-foreground">{new Date(tx.created_at).toLocaleString()}</p>
                                     </div>
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-3 justify-between sm:justify-end">
                                         <span className="text-sm font-bold">&euro;{tx.amount.toLocaleString()}</span>
                                         <Badge variant={tx.status === 'completed' ? 'secondary' : 'outline'}>{tx.status}</Badge>
                                     </div>

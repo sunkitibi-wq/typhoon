@@ -71,6 +71,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::match(['get', 'post'], 'users/create', [AdminController::class, 'createUser'])->name('users.create');
         Route::match(['get', 'post'], 'users/{user}/edit', [AdminController::class, 'editUser'])->name('users.edit');
         Route::get('users/{user}', [AdminController::class, 'userDetail'])->name('users.detail');
+        Route::get('accounts', [AdminController::class, 'accounts'])->name('accounts');
+        Route::post('accounts/{account}/approve', [AdminController::class, 'approveAccount'])->name('accounts.approve');
+        Route::post('accounts/{account}/reject', [AdminController::class, 'rejectAccount'])->name('accounts.reject');
+        Route::post('accounts/{account}/freeze', [AdminController::class, 'freezeAccount'])->name('accounts.freeze');
+        Route::post('accounts/{account}/unfreeze', [AdminController::class, 'unfreezeAccount'])->name('accounts.unfreeze');
+        Route::post('accounts/{account}/close', [AdminController::class, 'closeAccount'])->name('accounts.close');
         Route::get('audit-logs', [AdminController::class, 'auditLogs'])->name('audit-logs');
         Route::match(['get', 'post'], 'api-clients', [AdminController::class, 'apiClients'])->name('api-clients');
         Route::post('api-clients/{client}/revoke', [AdminController::class, 'revokeApiClient'])->name('api-clients.revoke');

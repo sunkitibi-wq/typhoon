@@ -22,11 +22,12 @@ class AccountService
                 'account_type_id' => $type->id,
                 'account_number' => $this->generateAccountNumber(),
                 'iban' => $this->generateIban($user->country_of_residence ?? 'DE'),
+                'swift_bic' => 'COBADEFFXXX',
                 'currency' => $currency,
                 'balance' => 0,
                 'available_balance' => 0,
                 'ledger_balance' => 0,
-                'status' => 'active',
+                'status' => 'pending',
                 'label' => $label ?? $type->name,
                 'is_default' => $isFirst,
             ]);

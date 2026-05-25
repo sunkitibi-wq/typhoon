@@ -22,10 +22,12 @@ class UpdateExchangeRates extends Command
 
         $this->info("Updating exchange rates from source: {$source}");
 
-        match ($source) {
-            'coingecko' => $this->fromCoinGecko($base),
-            default => $this->fromMock($base),
-        };
+        if ($source === 'coingecko') {
+            $this->fromCoinGecko($base);
+            $this->fromFrankfurter($base);
+        } else {
+            $this->fromMock($base);
+        }
 
         $this->newLine();
         $this->info('Exchange rates updated successfully.');
@@ -103,6 +105,91 @@ class UpdateExchangeRates extends Command
         $this->info("Updated {$count} exchange rates from CoinGecko.");
     }
 
+    private function fromFrankfurter(string $base): void
+    {
+        $this->info("Fetching fiat rates from Frankfurter against base: {$base}...");
+        
+        try {
+            $response = Http::get("https://api.frankfurter.app/latest", [
+                'base' => $base,
+            ]);
+
+            if ($response->failed()) {
+                $this->error('Failed to fetch rates from Frankfurter: ' . $response->body());
+                return;
+            }
+
+            $data = $response->json();
+            $rates = $data['rates'] ?? [];
+            $count = 0;
+
+            foreach ($rates as $currency => $rate) {
+                if (!in_array($currency, ['USD', 'GBP', 'CHF'])) {
+                    continue;
+                }
+
+                ExchangeRate::updateOrCreate(
+                    ['base_currency' => strtoupper($base), 'quote_currency' => $currency],
+                    [
+                        'bid' => $rate * 0.999,
+                        'ask' => $rate * 1.001,
+                        'mid_rate' => $rate,
+                        'change_24h' => (rand(-100, 100) / 100),
+                        'volume_24h' => rand(10000000, 50000000),
+                        'high_24h' => $rate * 1.01,
+                        'low_24h' => $rate * 0.99,
+                        'last_refreshed_at' => now(),
+                    ]
+                );
+
+                $inverseRate = 1 / $rate;
+                ExchangeRate::updateOrCreate(
+                    ['base_currency' => $currency, 'quote_currency' => strtoupper($base)],
+                    [
+                        'bid' => $inverseRate * 0.999,
+                        'ask' => $inverseRate * 1.001,
+                        'mid_rate' => $inverseRate,
+                        'change_24h' => (rand(-100, 100) / 100),
+                        'volume_24h' => rand(10000000, 50000000),
+                        'high_24h' => $inverseRate * 1.01,
+                        'low_24h' => $inverseRate * 0.99,
+                        'last_refreshed_at' => now(),
+                    ]
+                );
+                $count += 2;
+            }
+
+            $fiatCurrencies = ['USD', 'GBP', 'CHF'];
+            foreach ($fiatCurrencies as $c1) {
+                foreach ($fiatCurrencies as $c2) {
+                    if ($c1 === $c2) continue;
+                    $rateC1InBase = $rates[$c1] ?? 1.0;
+                    $rateC2InBase = $rates[$c2] ?? 1.0;
+                    $crossRate = $rateC2InBase / $rateC1InBase;
+                    
+                    ExchangeRate::updateOrCreate(
+                        ['base_currency' => $c1, 'quote_currency' => $c2],
+                        [
+                            'bid' => $crossRate * 0.999,
+                            'ask' => $crossRate * 1.001,
+                            'mid_rate' => $crossRate,
+                            'change_24h' => (rand(-100, 100) / 100),
+                            'volume_24h' => rand(10000000, 50000000),
+                            'high_24h' => $crossRate * 1.01,
+                            'low_24h' => $crossRate * 0.99,
+                            'last_refreshed_at' => now(),
+                        ]
+                    );
+                    $count++;
+                }
+            }
+
+            $this->info("Updated {$count} fiat exchange rates from Frankfurter.");
+        } catch (\Exception $e) {
+            $this->error('Frankfurter API Error: ' . $e->getMessage());
+        }
+    }
+
     private function fromMock(string $base): void
     {
         $rates = [
@@ -130,6 +217,69 @@ class UpdateExchangeRates extends Command
                 ]
             );
             $count++;
+        }
+
+        $fiatMock = [
+            'USD' => 1.08 + (rand(-10, 10) / 1000),
+            'GBP' => 0.85 + (rand(-10, 10) / 1000),
+            'CHF' => 0.96 + (rand(-10, 10) / 1000),
+        ];
+
+        foreach ($fiatMock as $currency => $rate) {
+            ExchangeRate::updateOrCreate(
+                ['base_currency' => strtoupper($base), 'quote_currency' => $currency],
+                [
+                    'bid' => $rate * 0.999,
+                    'ask' => $rate * 1.001,
+                    'mid_rate' => $rate,
+                    'change_24h' => (rand(-100, 100) / 100),
+                    'volume_24h' => rand(10000000, 50000000),
+                    'high_24h' => $rate * 1.01,
+                    'low_24h' => $rate * 0.99,
+                    'last_refreshed_at' => now(),
+                ]
+            );
+
+            $inverseRate = 1 / $rate;
+            ExchangeRate::updateOrCreate(
+                ['base_currency' => $currency, 'quote_currency' => strtoupper($base)],
+                [
+                    'bid' => $inverseRate * 0.999,
+                    'ask' => $inverseRate * 1.001,
+                    'mid_rate' => $inverseRate,
+                    'change_24h' => (rand(-100, 100) / 100),
+                    'volume_24h' => rand(10000000, 50000000),
+                    'high_24h' => $inverseRate * 1.01,
+                    'low_24h' => $inverseRate * 0.99,
+                    'last_refreshed_at' => now(),
+                ]
+            );
+            $count += 2;
+        }
+
+        $fiatCurrencies = ['USD', 'GBP', 'CHF'];
+        foreach ($fiatCurrencies as $c1) {
+            foreach ($fiatCurrencies as $c2) {
+                if ($c1 === $c2) continue;
+                $rateC1InBase = $fiatMock[$c1];
+                $rateC2InBase = $fiatMock[$c2];
+                $crossRate = $rateC2InBase / $rateC1InBase;
+                
+                ExchangeRate::updateOrCreate(
+                    ['base_currency' => $c1, 'quote_currency' => $c2],
+                    [
+                        'bid' => $crossRate * 0.999,
+                        'ask' => $crossRate * 1.001,
+                        'mid_rate' => $crossRate,
+                        'change_24h' => (rand(-100, 100) / 100),
+                        'volume_24h' => rand(10000000, 50000000),
+                        'high_24h' => $crossRate * 1.01,
+                        'low_24h' => $crossRate * 0.99,
+                        'last_refreshed_at' => now(),
+                    ]
+                );
+                $count++;
+            }
         }
 
         $this->info("Updated {$count} mock exchange rates (base: {$base}).");
