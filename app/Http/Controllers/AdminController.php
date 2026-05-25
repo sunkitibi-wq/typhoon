@@ -267,7 +267,7 @@ class AdminController extends Controller
 
     public function userDetail(User $user)
     {
-        $user->load('role', 'kycVerification', 'accounts.cryptoWallets');
+        $user->load('role', 'kycVerification', 'accounts', 'cryptoWallets.cryptoCurrency');
 
         $portfolio = $this->reportService->userPortfolio($user);
 
