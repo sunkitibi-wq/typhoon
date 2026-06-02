@@ -1170,4 +1170,119 @@ class BankingController extends Controller
             'unread_count' => $unreadCount,
         ]);
     }
+
+    public function posDashboard(Request $request)
+    {
+        $user = $request->user();
+
+        $terminals = \App\Models\Banking\PosTerminal::where('user_id', $user->id)
+            ->with('account')
+            ->latest()
+            ->get();
+
+        $transactions = \App\Models\Banking\PosTransaction::whereHas('posTerminal', function ($q) use ($user) {
+            $q->where('user_id', $user->id);
+        })
+        ->with('posTerminal.account')
+        ->latest()
+        ->get();
+
+        $accounts = $user->accounts()->where('status', 'active')->get();
+
+        return Inertia::render('banking/pos', [
+            'terminals' => $terminals->map(fn($t) => [
+                'id' => $t->id,
+                'serial_number' => $t->serial_number,
+                'label' => $t->label,
+                'model' => $t->model,
+                'status' => $t->status,
+                'account_number' => $t->account?->account_number,
+                'account_label' => $t->account?->label,
+                'paired_at' => $t->paired_at,
+                'last_active_at' => $t->last_active_at,
+            ]),
+            'pos_transactions' => $transactions->map(fn($pt) => [
+                'id' => $pt->id,
+                'terminal_reference' => $pt->terminal_reference,
+                'terminal_serial' => $pt->posTerminal?->serial_number,
+                'amount' => (float) $pt->amount,
+                'currency' => $pt->currency,
+                'card_brand' => $pt->card_brand,
+                'card_last4' => $pt->card_last4,
+                'payment_method' => $pt->payment_method,
+                'status' => $pt->status,
+                'created_at' => $pt->created_at,
+            ]),
+            'accounts' => $accounts->map(fn($a) => [
+                'id' => $a->id,
+                'number' => $a->account_number,
+                'label' => $a->label,
+                'balance' => (float) $a->balance,
+                'currency' => $a->currency,
+            ]),
+        ]);
+    }
+
+    public function pairTerminal(Request $request)
+    {
+        $validated = $request->validate([
+            'account_id' => 'required|exists:accounts,id',
+            'serial_number' => 'required|string|max:50',
+            'label' => 'nullable|string|max:255',
+            'model' => 'nullable|string|max:255',
+            'pairing_code' => 'nullable|string|max:20',
+        ]);
+
+        $account = Account::findOrFail($validated['account_id']);
+
+        try {
+            $service = app(\App\Services\PosGatewayService::class);
+            $service->pairTerminal($request->user(), $account, $validated);
+
+            return redirect()->route('banking.pos')->with('success', 'Terminal paired successfully');
+        } catch (\Exception $e) {
+            return back()->withErrors(['serial_number' => $e->getMessage()]);
+        }
+    }
+
+    public function toggleTerminal(\App\Models\Banking\PosTerminal $terminal, Request $request)
+    {
+        if ($terminal->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        $terminal->update([
+            'status' => $terminal->status === 'active' ? 'inactive' : 'active',
+        ]);
+
+        return redirect()->route('banking.pos')->with('success', 'Terminal status updated');
+    }
+
+    public function deleteTerminal(\App\Models\Banking\PosTerminal $terminal, Request $request)
+    {
+        if ($terminal->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        $terminal->delete();
+
+        return redirect()->route('banking.pos')->with('success', 'Terminal deleted');
+    }
+
+    public function refundPosTransaction(\App\Models\Banking\PosTransaction $posTransaction, Request $request)
+    {
+        $terminal = $posTransaction->posTerminal;
+        if ($terminal && $terminal->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        try {
+            $service = app(\App\Services\PosGatewayService::class);
+            $service->refundPayment($posTransaction, $request->user());
+
+            return redirect()->route('banking.pos')->with('success', 'Transaction refunded successfully');
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
+        }
+    }
 }

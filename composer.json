@@ -12,6 +12,7 @@
         "php": "^8.3",
         "barryvdh/laravel-dompdf": "*",
         "inertiajs/inertia-laravel": "^3.0",
+        "kornrunner/ethereum-offline-raw-tx": "^0.9.0",
         "laravel/cashier": "*",
         "laravel/fortify": "^1.34",
         "laravel/framework": "^13.7",

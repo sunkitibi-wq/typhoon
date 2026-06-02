@@ -4,6 +4,11 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use kornrunner\Ethereum\Transaction as EthereumTransaction;
+use kornrunner\Keccak;
+use kornrunner\Serializer\HexPrivateKeySerializer;
+use Mdanter\Ecc\Curves\CurveFactory;
+use Mdanter\Ecc\Curves\SecgCurve;
 
 class BlockchainService
 {
@@ -29,7 +34,7 @@ class BlockchainService
             ];
         }
 
-        return $this->generateAddressViaRpc();
+        return $this->generateLocalKeyPair();
     }
 
     public function getBalance(string $address): string
@@ -41,29 +46,28 @@ class BlockchainService
         return $this->callRpc('eth_getBalance', [$address, 'latest']);
     }
 
-    public function sendTransaction(string $fromAddress, string $toAddress, ?string $valueInWei = null, string $hexData = '0x', string $network = 'ethereum'): string
+    public function sendTransaction(string $privateKey, string $toAddress, ?string $valueInWei = null, string $hexData = '0x', string $gasLimit = '0x5208', ?string $customGasPrice = null): string
     {
         if ($this->provider === 'mock') {
             return '0x' . Str::random(64);
         }
 
+        $fromAddress = $this->addressFromPrivateKey($privateKey);
         $txCount = $this->callRpc('eth_getTransactionCount', [$fromAddress, 'pending']);
-        $gasPrice = $this->callRpc('eth_gasPrice', []);
+        $gasPrice = $customGasPrice ?? $this->callRpc('eth_gasPrice', []);
 
-        $tx = [
-            'from' => $fromAddress,
-            'to' => $toAddress,
-            'data' => $hexData,
-            'gas' => '0x5208',
-            'gasPrice' => $gasPrice,
-            'nonce' => $txCount,
-        ];
+        $transaction = new EthereumTransaction(
+            $txCount,
+            $gasPrice,
+            $gasLimit,
+            $toAddress,
+            $valueInWei ?? '0x0',
+            $hexData,
+        );
 
-        if ($valueInWei) {
-            $tx['value'] = $valueInWei;
-        }
+        $raw = '0x' . $transaction->getRaw($this->stripHexPrefix($privateKey), $this->getChainId());
 
-        return $this->callRpc('eth_sendTransaction', [$tx]);
+        return $this->callRpc('eth_sendRawTransaction', [$raw]);
     }
 
     public function getTransactionStatus(string $txHash): array
@@ -139,13 +143,56 @@ class BlockchainService
         return false;
     }
 
-    private function generateAddressViaRpc(): array
+    private function generateLocalKeyPair(): array
     {
-        $result = $this->callRpc('personal_newAccount', ['']);
+        $privateKey = bin2hex(random_bytes(32));
+        $address = $this->addressFromPrivateKey($privateKey);
+
         return [
-            'address' => $result,
-            'private_key' => null,
+            'address' => $address,
+            'private_key' => '0x' . $privateKey,
         ];
+    }
+
+    private function addressFromPrivateKey(string $privateKey): string
+    {
+        $privateKey = $this->stripHexPrefix($privateKey);
+
+        $generator = CurveFactory::getGeneratorByName(SecgCurve::NAME_SECP_256K1);
+        $serializer = new HexPrivateKeySerializer($generator);
+        $privateKeyObject = $serializer->parse($privateKey);
+        $publicKey = $privateKeyObject->getPublicKey();
+        $point = $publicKey->getPoint();
+
+        $x = $this->hexup(gmp_strval($point->getX(), 16));
+        $y = $this->hexup(gmp_strval($point->getY(), 16));
+
+        $publicKeyHex = $x . $y;
+        $address = Keccak::hash(hex2bin($publicKeyHex), 256);
+
+        return '0x' . substr($address, -40);
+    }
+
+    private function stripHexPrefix(string $value): string
+    {
+        return strtolower(str_replace('0x', '', $value));
+    }
+
+    private function hexup(string $value): string
+    {
+        return strlen($value) % 2 === 0 ? $value : "0{$value}";
+    }
+
+    private function getChainId(): int
+    {
+        return match (true) {
+            str_contains($this->network, 'mainnet') => 1,
+            str_contains($this->network, 'sepolia') => 11155111,
+            str_contains($this->network, 'goerli') => 5,
+            str_contains($this->network, 'rinkeby') => 4,
+            str_contains($this->network, 'kovan') => 42,
+            default => 1,
+        };
     }
 
     private function callRpc(string $method, array $params = []): mixed

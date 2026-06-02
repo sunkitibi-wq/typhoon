@@ -53,9 +53,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/crypto/deposits/{deposit}/confirm', [CryptoController::class, 'confirmDeposit']);
     Route::get('/crypto/withdrawals', [CryptoController::class, 'withdrawals']);
     Route::post('/crypto/withdrawals', [CryptoController::class, 'requestWithdrawal']);
+    Route::post('/crypto/transactions/send', [CryptoController::class, 'sendTransaction']);
 
     // Portfolio
     Route::get('/portfolio', [PortfolioController::class, 'overview']);
+
+    // POS Terminal Integration
+    Route::post('/pos/sale', [\App\Http\Controllers\Api\PosController::class, 'processTerminalPayment']);
+    Route::post('/pos/refund', [\App\Http\Controllers\Api\PosController::class, 'processTerminalRefund']);
 });
 
 // Admin routes

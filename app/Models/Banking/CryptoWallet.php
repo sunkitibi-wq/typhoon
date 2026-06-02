@@ -10,7 +10,11 @@ class CryptoWallet extends Model
 {
     protected $fillable = [
         'user_id', 'crypto_currency_id', 'address', 'label',
-        'balance', 'locked_balance', 'status',
+        'balance', 'locked_balance', 'status', 'private_key',
+    ];
+
+    protected $hidden = [
+        'private_key',
     ];
 
     protected function casts(): array
@@ -18,6 +22,7 @@ class CryptoWallet extends Model
         return [
             'balance' => 'decimal:8',
             'locked_balance' => 'decimal:8',
+            'private_key' => 'encrypted',
         ];
     }
 

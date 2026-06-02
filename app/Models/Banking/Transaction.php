@@ -55,4 +55,9 @@ class Transaction extends Model
     {
         return $this->hasOne(SwiftTransfer::class);
     }
+
+    public function posTransaction(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(PosTransaction::class);
+    }
 }

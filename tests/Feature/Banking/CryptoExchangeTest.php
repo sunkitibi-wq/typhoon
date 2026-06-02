@@ -92,6 +92,8 @@ class CryptoExchangeTest extends TestCase
 
         $this->assertNotNull($wallet->address);
         $this->assertStringStartsWith('0x', $wallet->address);
+        $this->assertNotNull($wallet->private_key);
+        $this->assertStringStartsWith('0x', $wallet->private_key);
     }
 
     public function test_cannot_create_duplicate_wallet(): void
@@ -338,6 +340,24 @@ class CryptoExchangeTest extends TestCase
 
         $response->assertCreated()
             ->assertJsonStructure(['message', 'order']);
+    }
+
+    public function test_api_send_crypto_transaction(): void
+    {
+        $ethWallet = $this->service->createWallet($this->user, $this->eur);
+        $ethWallet->increment('balance', 10);
+
+        $response = $this->actingAs($this->user)->postJson('/api/crypto/transactions/send', [
+            'wallet_id' => $ethWallet->id,
+            'amount' => 1,
+            'to_address' => '0xdestination123',
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonStructure(['message', 'withdrawal' => ['reference', 'tx_hash', 'status']]);
+
+        $ethWallet->refresh();
+        $this->assertEquals(9.0, (float) $ethWallet->balance);
     }
 
     public function test_api_quote(): void

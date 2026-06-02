@@ -206,6 +206,41 @@ class CryptoController extends Controller
         }
     }
 
+    public function sendTransaction(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'wallet_id' => 'required|exists:crypto_wallets,id',
+            'amount' => 'required|numeric|min:0.00000001',
+            'to_address' => 'required|string|max:255',
+            'gas_limit' => 'nullable|integer|min:21000',
+            'gas_price' => 'nullable|string|max:255',
+        ]);
+
+        $wallet = CryptoWallet::findOrFail($validated['wallet_id']);
+
+        if ($wallet->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        try {
+            $withdrawal = $this->cryptoService->sendCrypto(
+                $request->user(),
+                $wallet,
+                $validated['amount'],
+                $validated['to_address'],
+                $validated['gas_limit'] ?? null,
+                $validated['gas_price'] ?? null,
+            );
+
+            return response()->json([
+                'message' => 'Transaction submitted',
+                'withdrawal' => $withdrawal->only(['reference', 'tx_hash', 'status']),
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
     public function confirmDeposit(Request $request, CryptoDeposit $deposit): JsonResponse
     {
         if ($deposit->user_id !== $request->user()->id) {

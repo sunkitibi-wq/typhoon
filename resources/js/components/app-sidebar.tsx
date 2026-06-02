@@ -3,7 +3,7 @@ import {
     LayoutGrid, Wallet, ArrowLeftRight, CreditCard, Shield,
     TrendingUp, BarChart3, Users, AlertTriangle, Settings, Building2, Send,
     UserPlus, CalendarClock, Landmark, Globe, FileText, Bell, Key,
-    Database, Eye, DollarSign, ScrollText, Sliders,
+    Database, Eye, DollarSign, ScrollText, Sliders, Tablet,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -64,6 +64,11 @@ const bankingNavItems: NavItem[] = [
         title: 'Crypto Exchange',
         href: '/banking/crypto',
         icon: BarChart3,
+    },
+    {
+        title: 'POS Gateway',
+        href: '/banking/pos',
+        icon: Tablet,
     },
     {
         title: 'Beneficiaries',

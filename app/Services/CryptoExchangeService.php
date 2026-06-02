@@ -10,6 +10,7 @@ use App\Models\Banking\CryptoWallet;
 use App\Models\Banking\CryptoWithdrawal;
 use App\Models\Banking\ExchangeRate;
 use App\Models\User;
+use Brick\Math\BigDecimal;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -33,6 +34,7 @@ class CryptoExchangeService
             'crypto_currency_id' => $currency->id,
             'address' => $keyPair['address'],
             'label' => $label ?? "{$currency->name} Wallet",
+            'private_key' => $keyPair['private_key'],
             'balance' => 0,
             'locked_balance' => 0,
             'status' => 'active',
@@ -189,7 +191,7 @@ class CryptoExchangeService
         return DB::transaction(function () use ($user, $wallet, $currency, $amount, $toAddress) {
             $walletLocked = CryptoWallet::where('id', $wallet->id)->lockForUpdate()->firstOrFail();
 
-            if ($walletLocked->balance < $amount + $currency->withdrawal_fee) {
+            if ($walletLocked->balance < $amount) {
                 throw new \RuntimeException('Insufficient balance');
             }
 
@@ -212,17 +214,88 @@ class CryptoExchangeService
         });
     }
 
+    public function sendCrypto(User $user, CryptoWallet $wallet, float $amount, string $toAddress, ?int $gasLimit = null, ?string $gasPrice = null): CryptoWithdrawal
+    {
+        if ($wallet->user_id !== $user->id) {
+            throw new \RuntimeException('Wallet does not belong to user');
+        }
+
+        $currency = $wallet->cryptoCurrency;
+
+        if ($amount < $currency->minimum_withdrawal) {
+            throw new \RuntimeException("Minimum withdrawal is {$currency->minimum_withdrawal} {$currency->code}");
+        }
+
+        return DB::transaction(function () use ($user, $wallet, $currency, $amount, $toAddress, $gasLimit, $gasPrice) {
+            $walletLocked = CryptoWallet::where('id', $wallet->id)->lockForUpdate()->firstOrFail();
+
+            if ($walletLocked->balance < $amount) {
+                throw new \RuntimeException('Insufficient balance');
+            }
+
+            $valueHex = $this->toWeiHex($amount - $currency->withdrawal_fee, $currency->decimals);
+            $txHash = null;
+
+            if ($this->blockchain->isConfigured()) {
+                $privateKey = $walletLocked->private_key;
+
+                if (!$privateKey) {
+                    throw new \RuntimeException('Wallet private key is required to broadcast the transaction.');
+                }
+
+                try {
+                    $txHash = $this->blockchain->sendTransaction(
+                        $privateKey,
+                        $toAddress,
+                        $valueHex,
+                        '0x',
+                        $gasLimit ? '0x' . dechex($gasLimit) : '0x5208',
+                        $gasPrice,
+                    );
+                } catch (\Exception $e) {
+                    throw new \RuntimeException('Blockchain broadcast failed: ' . $e->getMessage());
+                }
+            }
+
+            $withdrawal = CryptoWithdrawal::create([
+                'reference' => $this->generateReference('CRYPTO-WTH'),
+                'user_id' => $user->id,
+                'crypto_currency_id' => $currency->id,
+                'crypto_wallet_id' => $walletLocked->id,
+                'to_address' => $toAddress,
+                'amount' => $amount,
+                'fee' => $currency->withdrawal_fee,
+                'net_amount' => $amount - $currency->withdrawal_fee,
+                'status' => $txHash ? 'submitted' : 'pending',
+                'tx_hash' => $txHash,
+            ]);
+
+            $walletLocked->decrement('balance', $amount);
+
+            return $withdrawal;
+        });
+    }
+
     public function approveWithdrawal(CryptoWithdrawal $withdrawal, User $admin): void
     {
         DB::transaction(function () use ($withdrawal, $admin) {
             $txHash = null;
 
             if ($this->blockchain->isConfigured()) {
+                $wallet = $withdrawal->cryptoWallet;
+                $privateKey = $wallet->private_key;
+
+                if (!$privateKey) {
+                    throw new \RuntimeException('Wallet private key is required to broadcast the transaction.');
+                }
+
                 try {
+                    $valueHex = $this->toWeiHex($withdrawal->net_amount, $wallet->cryptoCurrency->decimals);
+
                     $txHash = $this->blockchain->sendTransaction(
-                        $withdrawal->cryptoWallet->address,
+                        $privateKey,
                         $withdrawal->to_address,
-                        '0x',
+                        $valueHex,
                     );
                 } catch (\Exception $e) {
                     throw new \RuntimeException('Blockchain broadcast failed: ' . $e->getMessage());
@@ -278,10 +351,13 @@ class CryptoExchangeService
 
             $currency = CryptoCurrency::where('code', $cryptoCode)->firstOrFail();
 
+            $walletKeypair = $this->blockchain->generateAddress();
+
             $wallet = CryptoWallet::firstOrCreate(
                 ['user_id' => $user->id, 'crypto_currency_id' => $currency->id],
                 [
-                    'address' => $this->blockchain->generateAddress()['address'],
+                    'address' => $walletKeypair['address'],
+                    'private_key' => $walletKeypair['private_key'],
                     'label' => "{$currency->name} Wallet",
                     'balance' => 0,
                     'locked_balance' => 0,
@@ -297,7 +373,7 @@ class CryptoExchangeService
                 try {
                     $weiHex = '0x' . dechex($netCrypto * 1e18);
                     $txHash = $this->blockchain->sendTransaction(
-                        $walletLocked->address,
+                        $walletLocked->private_key,
                         $externalAddress,
                         $weiHex,
                     );
@@ -380,5 +456,14 @@ class CryptoExchangeService
     private function generateReference(string $prefix): string
     {
         return $prefix . '-' . strtoupper(Str::random(10));
+    }
+
+    private function toWeiHex(float $amount, int $decimals): string
+    {
+        $value = BigDecimal::of((string) $amount)
+            ->multipliedBy(BigDecimal::of(10)->power($decimals))
+            ->toBigInteger();
+
+        return '0x' . $value->toString(16);
     }
 }
