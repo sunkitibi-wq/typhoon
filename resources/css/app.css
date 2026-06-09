@@ -1,0 +1,260 @@
+@import 'tailwindcss';
+
+@import 'tw-animate-css';
+
+@source '../views';
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+    --font-sans:
+        'Instrument Sans', ui-sans-serif, system-ui, sans-serif,
+        'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+        'Noto Color Emoji';
+
+    --radius-lg: var(--radius);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-sm: calc(var(--radius) - 4px);
+
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+    --primary: oklch(0.205 0 0);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --destructive-foreground: oklch(0.577 0.245 27.325);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.87 0 0);
+    --chart-1: oklch(0.646 0.222 41.116);
+    --chart-2: oklch(0.6 0.118 184.704);
+    --chart-3: oklch(0.398 0.07 227.392);
+    --chart-4: oklch(0.828 0.189 84.429);
+    --chart-5: oklch(0.769 0.188 70.08);
+    --radius: 0.625rem;
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.145 0 0);
+    --sidebar-primary: oklch(0.205 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.97 0 0);
+    --sidebar-accent-foreground: oklch(0.205 0 0);
+    --sidebar-border: oklch(0.922 0 0);
+    --sidebar-ring: oklch(0.87 0 0);
+}
+
+.dark {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.145 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.145 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.985 0 0);
+    --primary-foreground: oklch(0.205 0 0);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.396 0.141 25.723);
+    --destructive-foreground: oklch(0.637 0.237 25.331);
+    --border: oklch(0.269 0 0);
+    --input: oklch(0.269 0 0);
+    --ring: oklch(0.439 0 0);
+    --chart-1: oklch(0.488 0.243 264.376);
+    --chart-2: oklch(0.696 0.17 162.48);
+    --chart-3: oklch(0.769 0.188 70.08);
+    --chart-4: oklch(0.627 0.265 303.9);
+    --chart-5: oklch(0.645 0.246 16.439);
+    --sidebar: oklch(0.205 0 0);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.985 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(0.269 0 0);
+    --sidebar-ring: oklch(0.439 0 0);
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+
+    body {
+        @apply bg-background text-foreground;
+    }
+}
+
+.admin-theme {
+    --background: #f8fafc;
+    --foreground: #0f172a;
+    --card: #ffffff;
+    --card-foreground: #0f172a;
+    --popover: #ffffff;
+    --popover-foreground: #0f172a;
+    --border: #cbd5e1;
+    --input: #cbd5e1;
+    --ring: #0ea5e9;
+    
+    --sidebar: #f1f5f9;
+    --sidebar-border: #cbd5e1;
+    --sidebar-foreground: #0f172a;
+    --sidebar-accent: #e2e8f0;
+    --sidebar-accent-foreground: #0ea5e9;
+    --sidebar-ring: #0ea5e9;
+    --primary: #0ea5e9;
+    --primary-foreground: #ffffff;
+}
+
+.admin-theme [data-sidebar="sidebar"],
+.admin-theme [data-slot="sidebar-wrapper"] {
+    background-color: #f1f5f9 !important;
+}
+
+.admin-theme [data-sidebar="sidebar"] {
+    border-color: #cbd5e1 !important;
+}
+
+.admin-theme [data-slot="sidebar-menu-button"] {
+    color: #334155;
+}
+
+.admin-theme [data-slot="sidebar-menu-button"][data-active="true"] {
+    background-color: #e2e8f0 !important;
+    color: #0ea5e9 !important;
+}
+
+.admin-theme [data-slot="sidebar-inset"] {
+    background: radial-gradient(circle at top left, rgba(56,189,248,0.1), transparent 30%), 
+                radial-gradient(circle at top right, rgba(14,165,233,0.08), transparent 30%), 
+                #f8fafc !important;
+}
+
+.admin-theme [data-slot="input"],
+.admin-theme select,
+.admin-theme textarea {
+    background-color: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+}
+
+.dark.admin-theme,
+.dark .admin-theme {
+    --background: #020617;
+    --foreground: oklch(0.985 0 0);
+    --card: rgba(15, 23, 42, 0.95);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: #090d16;
+    --popover-foreground: oklch(0.985 0 0);
+    --border: #1e293b;
+    --input: #1e293b;
+    --ring: #0ea5e9;
+    
+    --sidebar: #090d16;
+    --sidebar-border: #1e293b;
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-accent: rgba(56, 189, 248, 0.1);
+    --sidebar-accent-foreground: #38bdf8;
+    --sidebar-ring: #0ea5e9;
+    --primary: #38bdf8;
+    --primary-foreground: #020617;
+}
+
+.dark.admin-theme [data-sidebar="sidebar"],
+.dark .admin-theme [data-sidebar="sidebar"],
+.dark.admin-theme [data-slot="sidebar-wrapper"],
+.dark .admin-theme [data-slot="sidebar-wrapper"] {
+    background-color: #090d16 !important;
+}
+
+.dark.admin-theme [data-sidebar="sidebar"],
+.dark .admin-theme [data-sidebar="sidebar"] {
+    border-color: #1e293b !important;
+}
+
+.dark.admin-theme [data-slot="sidebar-menu-button"],
+.dark .admin-theme [data-slot="sidebar-menu-button"] {
+    color: oklch(0.985 0 0);
+}
+
+.dark.admin-theme [data-slot="sidebar-menu-button"][data-active="true"],
+.dark .admin-theme [data-slot="sidebar-menu-button"][data-active="true"] {
+    background-color: rgba(56, 189, 248, 0.1) !important;
+    color: #38bdf8 !important;
+}
+
+.dark.admin-theme [data-slot="sidebar-inset"],
+.dark .admin-theme [data-slot="sidebar-inset"] {
+    background: radial-gradient(circle at top left, rgba(56,189,248,0.18), transparent 26%), 
+                radial-gradient(circle at top right, rgba(14,165,233,0.14), transparent 28%), 
+                radial-gradient(circle at bottom, rgba(15,23,42,0.95), transparent 55%), 
+                #020617 !important;
+}
+
+.dark.admin-theme [data-slot="input"],
+.dark .admin-theme [data-slot="input"],
+.dark.admin-theme select,
+.dark .admin-theme select,
+.dark.admin-theme textarea,
+.dark .admin-theme textarea {
+    background-color: rgba(30, 41, 59, 0.5) !important;
+    border-color: #334155 !important;
+    color: #f8fafc !important;
+}

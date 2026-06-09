@@ -1,0 +1,8 @@
+- [x] Create shared layout `resources/views/layouts/stitch.blade.php`
+- [x] Create `admin.blade.php` & `client.blade.php` extending shared layout
+- [x] Add route files `routes/admin.php` & `routes/client.php`
+- [x] Update `routes/web.php` to include admin/client routes
+- [x] Create UI component partials (card, button)
+- [x] Add sample admin and client views using components
+- [x] Run tests to ensure existing functionality unchanged
+- [x] Update README with layout documentation
