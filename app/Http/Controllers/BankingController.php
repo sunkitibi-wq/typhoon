@@ -27,6 +27,7 @@ use App\Services\SepaService;
 use App\Services\SwiftService;
 use App\Services\TransactionRouter;
 use App\Services\TransactionService;
+use App\Services\CyberSourceService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -42,6 +43,7 @@ class BankingController extends Controller
         private readonly ReportService $reportService,
         private readonly LoanService $loanService,
         private readonly TransactionRouter $transactionRouter,
+        private readonly CyberSourceService $cyberSourceService,
     ) {}
 
     public function dashboard(Request $request)
@@ -963,16 +965,42 @@ class BankingController extends Controller
                 'amount' => 'required|numeric|min:0.01',
                 'method' => 'nullable|string|max:100',
                 'reference' => 'nullable|string|max:255',
+                'transient_token' => 'required_if:method,card|string',
+                'billing' => 'required_if:method,card|array',
+                'billing.first_name' => 'required_if:method,card|string|max:255',
+                'billing.last_name' => 'required_if:method,card|string|max:255',
+                'billing.address_line1' => 'required_if:method,card|string|max:255',
+                'billing.city' => 'required_if:method,card|string|max:255',
+                'billing.postal_code' => 'required_if:method,card|string|max:50',
+                'billing.country' => 'required_if:method,card|string|size:2',
+                'billing.email' => 'required_if:method,card|email|max:255',
             ]);
 
             $account = Account::findOrFail($validated['account_id']);
 
             try {
+                $refCode = $validated['reference'] ?? null;
+
+                if (($validated['method'] ?? 'bank_transfer') === 'card') {
+                    $res = $this->cyberSourceService->chargeToken(
+                        $validated['transient_token'],
+                        (float) $validated['amount'],
+                        $account->currency,
+                        $validated['billing']
+                    );
+
+                    if (($res['status'] ?? '') !== 'AUTHORIZED_AND_CAPTURED') {
+                        throw new \RuntimeException('CyberSource card authorization failed.');
+                    }
+
+                    $refCode = $res['clientReferenceInformation']['code'] ?? ('DEP-CS-' . strtoupper(bin2hex(random_bytes(6))));
+                }
+
                 $this->transactionService->deposit(
                     $account,
                     $validated['amount'],
                     $validated['method'] ?? 'bank_transfer',
-                    $validated['reference'] ?? null,
+                    $refCode,
                 );
 
                 return redirect()->route('banking.deposit')->with('success', 'Deposit completed');

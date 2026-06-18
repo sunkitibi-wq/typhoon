@@ -20,7 +20,7 @@ class CryptoController extends Controller
 
     public function currencies(): JsonResponse
     {
-        $currencies = CryptoCurrency::where('status', 'active')->get(['code', 'name', 'network', 'minimum_withdrawal', 'withdrawal_fee', 'minimum_deposit', 'icon_url']);
+        $currencies = CryptoCurrency::where('status', 'active')->get(['id', 'code', 'name', 'network', 'minimum_withdrawal', 'withdrawal_fee', 'minimum_deposit', 'icon_url']);
 
         return response()->json(['currencies' => $currencies]);
     }
@@ -32,13 +32,21 @@ class CryptoController extends Controller
         return response()->json([
             'wallets' => $wallets->map(fn($w) => [
                 'id' => $w->id,
+                'user_id' => $w->user_id,
+                'crypto_currency_id' => $w->crypto_currency_id,
                 'currency' => $w->cryptoCurrency->code,
+                'currency_code' => $w->cryptoCurrency->code,
+                'currency_name' => $w->cryptoCurrency->name,
                 'name' => $w->cryptoCurrency->name,
                 'network' => $w->cryptoCurrency->network,
                 'address' => $w->address,
                 'balance' => $w->balance,
                 'locked_balance' => $w->locked_balance,
                 'label' => $w->label,
+                'crypto_currency' => [
+                    'code' => $w->cryptoCurrency->code,
+                    'name' => $w->cryptoCurrency->name,
+                ],
             ]),
         ]);
     }
@@ -59,9 +67,17 @@ class CryptoController extends Controller
                 'message' => 'Wallet created successfully',
                 'wallet' => [
                     'id' => $wallet->id,
+                    'user_id' => $wallet->user_id,
+                    'crypto_currency_id' => $wallet->crypto_currency_id,
                     'address' => $wallet->address,
-                    'currency' => $currency->code,
+                    'balance' => $wallet->balance,
                     'label' => $wallet->label,
+                    'currency_code' => $currency->code,
+                    'currency_name' => $currency->name,
+                    'crypto_currency' => [
+                        'code' => $currency->code,
+                        'name' => $currency->name,
+                    ],
                 ],
             ], 201);
         } catch (\Exception $e) {
@@ -75,13 +91,17 @@ class CryptoController extends Controller
 
         return response()->json([
             'rates' => $rates->map(fn($r) => [
+                'base_currency' => $r->base_currency,
+                'quote_currency' => $r->quote_currency,
                 'pair' => "{$r->base_currency}/{$r->quote_currency}",
                 'bid' => $r->bid,
                 'ask' => $r->ask,
                 'mid' => $r->mid_rate,
+                'mid_rate' => $r->mid_rate,
                 'change_24h' => $r->change_24h,
                 'volume_24h' => $r->volume_24h,
                 'last_refreshed' => $r->last_refreshed_at,
+                'updated_at' => $r->last_refreshed_at,
             ]),
         ]);
     }

@@ -130,7 +130,7 @@ class AccountController extends Controller
 
     public function getAccountTypes(): JsonResponse
     {
-        $types = AccountType::where('is_active', true)->get(['code', 'name', 'description', 'currency', 'minimum_balance', 'monthly_fee', 'features']);
+        $types = AccountType::where('is_active', true)->get(['id', 'code', 'name', 'description', 'currency', 'minimum_balance', 'monthly_fee', 'features']);
 
         return response()->json(['account_types' => $types]);
     }

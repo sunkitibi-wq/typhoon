@@ -5,7 +5,7 @@
             @auth
                 <div class="flex space-x-4">
                     @if(auth()->user()->isAdmin())
-                        <a href="{{ route('admin.dashboard') }}" class="text-sm font-medium text-foreground hover:text-primary transition">Admin Dashboard</a>
+                        <a href="{{ route('admin.home') }}" class="text-sm font-medium text-foreground hover:text-primary transition">Admin Dashboard</a>
                     @else
                         <a href="{{ route('client.home') }}" class="text-sm font-medium text-foreground hover:text-primary transition">Client Portal</a>
                     @endif

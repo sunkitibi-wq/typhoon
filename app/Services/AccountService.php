@@ -7,6 +7,7 @@ use App\Models\Banking\AccountType;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Events\AccountCreated;
 
 class AccountService
 {
@@ -16,7 +17,7 @@ class AccountService
 
         $isFirst = $user->accounts()->count() === 0;
 
-        return DB::transaction(function () use ($user, $type, $currency, $label, $isFirst) {
+        $account = DB::transaction(function () use ($user, $type, $currency, $label, $isFirst) {
             $account = Account::create([
                 'user_id' => $user->id,
                 'account_type_id' => $type->id,
@@ -34,6 +35,10 @@ class AccountService
 
             return $account;
         });
+
+        event(new AccountCreated($account));
+
+        return $account;
     }
 
     public function getBalance(Account $account): array

@@ -10,6 +10,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\PersonalAccessToken;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Auth\Events\Registered;
 
 class AuthController extends Controller
 {
@@ -93,6 +97,8 @@ class AuthController extends Controller
 
         $token = $user->createToken('api-token')->plainTextToken;
 
+        event(new Registered($user));
+
         return response()->json([
             'token' => $token,
             'user' => [
@@ -137,5 +143,65 @@ class AuthController extends Controller
                 'kyc_status' => $user->kycVerification?->status ?? 'not_submitted',
             ],
         ]);
+    }
+
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => 'required|email|exists:users,email',
+        ]);
+
+        $code = random_int(100000, 999999);
+
+        DB::table('password_reset_tokens')->updateOrInsert(
+            ['email' => $validated['email']],
+            [
+                'token' => Hash::make($code),
+                'created_at' => now(),
+            ]
+        );
+
+        try {
+            Mail::raw("Your password reset OTP is: {$code}. This code will expire in 15 minutes.", function ($message) use ($validated) {
+                $message->to($validated['email'])->subject('Password Reset OTP');
+            });
+        } catch (\Exception $e) {
+            Log::error("Failed to send password reset email: " . $e->getMessage());
+        }
+
+        Log::info("Password reset OTP for {$validated['email']}: {$code}");
+
+        return response()->json(['message' => 'Reset code has been sent to your email.']);
+    }
+
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => 'required|email|exists:users,email',
+            'token' => 'required|string|size:6',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $record = DB::table('password_reset_tokens')->where('email', $validated['email'])->first();
+
+        if (!$record) {
+            return response()->json(['message' => 'Invalid or expired OTP.'], 422);
+        }
+
+        if (now()->subMinutes(15)->gt($record->created_at)) {
+            DB::table('password_reset_tokens')->where('email', $validated['email'])->delete();
+            return response()->json(['message' => 'OTP has expired.'], 422);
+        }
+
+        if (!Hash::check($validated['token'], $record->token)) {
+            return response()->json(['message' => 'Invalid OTP.'], 422);
+        }
+
+        $user = User::where('email', $validated['email'])->firstOrFail();
+        $user->update(['password' => Hash::make($validated['password'])]);
+
+        DB::table('password_reset_tokens')->where('email', $validated['email'])->delete();
+
+        return response()->json(['message' => 'Your password has been reset successfully.']);
     }
 }

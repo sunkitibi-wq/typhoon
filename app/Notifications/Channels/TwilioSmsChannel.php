@@ -15,10 +15,15 @@ class TwilioSmsChannel
 
         $message = $notification->toSms($notifiable);
 
-        $twilio = new Client(
-            config('services.twilio.sid'),
-            config('services.twilio.token')
-        );
+        $sid = config('services.twilio.sid');
+        $token = config('services.twilio.token');
+
+        if (empty($sid) || empty($token) || app()->environment('testing')) {
+            \Illuminate\Support\Facades\Log::info("SMS Notification to {$to}: {$message}");
+            return;
+        }
+
+        $twilio = new Client($sid, $token);
 
         $twilio->messages->create($to, [
             'from' => config('services.twilio.from'),

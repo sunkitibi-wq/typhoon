@@ -9,6 +9,7 @@ use App\Models\Banking\Transaction;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Events\TransactionCompleted;
 
 class TransactionService
 {
@@ -18,7 +19,7 @@ class TransactionService
 
     public function transfer(Account $from, Account $to, float $amount, ?string $description = null, ?User $initiator = null): Transaction
     {
-        return DB::transaction(function () use ($from, $to, $amount, $description, $initiator) {
+        $transaction = DB::transaction(function () use ($from, $to, $amount, $description, $initiator) {
             // Lock accounts in order of ID to prevent deadlocks
             $firstId = min($from->id, $to->id);
             $secondId = max($from->id, $to->id);
@@ -99,11 +100,15 @@ class TransactionService
 
             return $transaction->fresh();
         });
+
+        event(new TransactionCompleted($transaction));
+
+        return $transaction;
     }
 
     public function deposit(Account $account, float $amount, string $method = 'bank_transfer', ?string $reference = null): Transaction
     {
-        return DB::transaction(function () use ($account, $amount, $method, $reference) {
+        $transaction = DB::transaction(function () use ($account, $amount, $method, $reference) {
             $accountLocked = Account::where('id', $account->id)->lockForUpdate()->firstOrFail();
 
             $accountLocked->increment('balance', $amount);
@@ -128,11 +133,15 @@ class TransactionService
 
             return $transaction;
         });
+
+        event(new TransactionCompleted($transaction));
+
+        return $transaction;
     }
 
     public function withdraw(Account $account, float $amount, string $method = 'bank_transfer'): Transaction
     {
-        return DB::transaction(function () use ($account, $amount, $method) {
+        $transaction = DB::transaction(function () use ($account, $amount, $method) {
             $accountLocked = Account::where('id', $account->id)->lockForUpdate()->firstOrFail();
 
             $fee = $this->calculateFee('withdrawal', $amount, $accountLocked->currency);
@@ -175,6 +184,10 @@ class TransactionService
 
             return $transaction;
         });
+
+        event(new TransactionCompleted($transaction));
+
+        return $transaction;
     }
 
     public function reverseTransaction(Transaction $transaction, ?string $reason = null): Transaction
@@ -183,7 +196,7 @@ class TransactionService
             throw new \RuntimeException('Transaction already reversed');
         }
 
-        return DB::transaction(function () use ($transaction, $reason) {
+        $transaction = DB::transaction(function () use ($transaction, $reason) {
             $transaction->update(['status' => 'reversed', 'metadata' => array_merge(
                 $transaction->metadata ?? [],
                 ['reversal_reason' => $reason, 'reversed_at' => now()->toIso8601String()]
@@ -215,6 +228,10 @@ class TransactionService
 
             return $transaction->fresh();
         });
+
+        event(new TransactionCompleted($transaction));
+
+        return $transaction;
     }
 
     private function validateTransfer(Account $from, Account $to, float $amount): void

@@ -8,6 +8,14 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
+use Illuminate\Support\Facades\Event;
+use Illuminate\Auth\Events\Registered;
+use App\Listeners\SendWelcomeAndAdminRegistrationEmails;
+use App\Events\AccountCreated;
+use App\Listeners\SendAccountCreatedNotifications;
+use App\Events\TransactionCompleted;
+use App\Listeners\SendTransactionNotifications;
+
 class AppServiceProvider extends ServiceProvider
 {
     /**
@@ -24,6 +32,21 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+
+        Event::listen(
+            Registered::class,
+            SendWelcomeAndAdminRegistrationEmails::class
+        );
+
+        Event::listen(
+            AccountCreated::class,
+            SendAccountCreatedNotifications::class
+        );
+
+        Event::listen(
+            TransactionCompleted::class,
+            SendTransactionNotifications::class
+        );
     }
 
     /**

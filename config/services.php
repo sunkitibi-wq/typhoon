@@ -55,4 +55,14 @@ return [
         'coinapi_key' => env('COINAPI_API_KEY'),
     ],
 
+    'cybersource' => [
+        'merchant_id' => env('CYBERSOURCE_MERCHANT_ID'),
+        'api_key_id' => env('CYBERSOURCE_API_KEY_ID'),
+        'shared_secret' => env('CYBERSOURCE_SHARED_SECRET'),
+        'environment' => env('CYBERSOURCE_ENVIRONMENT', 'sandbox'),
+        'base_url' => env('CYBERSOURCE_ENVIRONMENT') === 'production'
+            ? 'https://api.cybersource.com'
+            : 'https://apitest.cybersource.com',
+    ],
+
 ];

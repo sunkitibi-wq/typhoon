@@ -7,11 +7,20 @@ use App\Http\Controllers\Api\CryptoController;
 use App\Http\Controllers\Api\KycController;
 use App\Http\Controllers\Api\PortfolioController;
 use App\Http\Controllers\Api\TransactionController;
+use App\Http\Controllers\Api\SepaController;
+use App\Http\Controllers\Api\SwiftController;
+use App\Http\Controllers\Api\StandingOrderController;
+use App\Http\Controllers\Api\LoanController;
+use App\Http\Controllers\Api\DepositController;
+use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\PosController;
 use Illuminate\Support\Facades\Route;
 
 // Public routes
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/register', [AuthController::class, 'register']);
+Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
+Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
 
 Route::get('/account-types', [AccountController::class, 'getAccountTypes']);
 Route::get('/crypto/currencies', [CryptoController::class, 'currencies']);
@@ -59,8 +68,43 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/portfolio', [PortfolioController::class, 'overview']);
 
     // POS Terminal Integration
-    Route::post('/pos/sale', [\App\Http\Controllers\Api\PosController::class, 'processTerminalPayment']);
-    Route::post('/pos/refund', [\App\Http\Controllers\Api\PosController::class, 'processTerminalRefund']);
+    Route::post('/pos/sale', [PosController::class, 'processTerminalPayment']);
+    Route::post('/pos/refund', [PosController::class, 'processTerminalRefund']);
+    Route::get('/pos/terminals', [PosController::class, 'indexTerminals']);
+    Route::post('/pos/terminals', [PosController::class, 'pairTerminal']);
+    Route::delete('/pos/terminals/{terminal}', [PosController::class, 'deleteTerminal']);
+    Route::post('/pos/terminals/{terminal}/toggle', [PosController::class, 'toggleTerminal']);
+    Route::get('/pos/transactions', [PosController::class, 'indexTransactions']);
+    Route::post('/pos/transactions/{posTransaction}/refund', [PosController::class, 'refundTransaction']);
+
+    // SEPA
+    Route::get('/sepa/transfers', [SepaController::class, 'index']);
+    Route::post('/sepa/transfers', [SepaController::class, 'storeTransfer']);
+    Route::post('/sepa/direct-debits', [SepaController::class, 'storeDirectDebit']);
+
+    // SWIFT
+    Route::get('/swift/transfers', [SwiftController::class, 'index']);
+    Route::post('/swift/transfers', [SwiftController::class, 'store']);
+
+    // Standing Orders
+    Route::get('/standing-orders', [StandingOrderController::class, 'index']);
+    Route::post('/standing-orders', [StandingOrderController::class, 'store']);
+    Route::post('/standing-orders/{order}/toggle', [StandingOrderController::class, 'toggle']);
+    Route::delete('/standing-orders/{order}', [StandingOrderController::class, 'destroy']);
+
+    // Deposits
+    Route::get('/deposits', [DepositController::class, 'index']);
+    Route::post('/deposits', [DepositController::class, 'store']);
+
+    // Loans
+    Route::get('/loans', [LoanController::class, 'index']);
+    Route::post('/loans', [LoanController::class, 'store']);
+    Route::get('/loans/{loan}', [LoanController::class, 'show']);
+    Route::post('/loans/{loan}/pay', [LoanController::class, 'pay']);
+
+    // Notifications
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead']);
 });
 
 // Admin routes

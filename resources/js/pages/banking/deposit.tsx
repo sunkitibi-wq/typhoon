@@ -11,10 +11,31 @@ interface Account { id: number; number: string; label: string; balance: number; 
 
 export default function Deposit({ accounts }: { accounts: Account[] }) {
     const { data, setData, post, processing, errors, reset } = useForm({
-        account_id: '', amount: '', method: 'bank_transfer', reference: '',
+        account_id: '',
+        amount: '',
+        method: 'bank_transfer',
+        reference: '',
+        transient_token: '',
+        billing: {
+            first_name: '',
+            last_name: '',
+            address_line1: '',
+            city: '',
+            postal_code: '',
+            country: 'US',
+            email: '',
+        },
     });
 
-    const submit = (e: React.FormEvent) => { e.preventDefault(); post(route('banking.deposit'), { onSuccess: () => reset() }); };
+    const submit = (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        if (data.method === 'card') {
+            data.transient_token = 'FLEX-TOK-MOCK-' + Math.random().toString(36).substring(2).toUpperCase();
+        }
+        
+        post(route('banking.deposit'), { onSuccess: () => reset() });
+    };
 
     return (
         <>
@@ -52,6 +73,66 @@ export default function Deposit({ accounts }: { accounts: Account[] }) {
                                         </SelectContent>
                                     </Select>
                                 </div>
+                                
+                                {data.method === 'card' && (
+                                    <div className="space-y-4 rounded-lg border border-border p-4 bg-muted/20">
+                                        <h3 className="font-semibold text-sm">Card Details</h3>
+                                        <div className="grid gap-4 grid-cols-3">
+                                            <div className="col-span-3 space-y-2">
+                                                <Label>Card Number</Label>
+                                                <Input type="text" placeholder="4111 1111 1111 1111" required />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Expiry Date</Label>
+                                                <Input type="text" placeholder="MM/YY" required />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>CVV</Label>
+                                                <Input type="password" placeholder="123" required />
+                                            </div>
+                                        </div>
+
+                                        <h3 className="font-semibold text-sm pt-2">Billing Information</h3>
+                                        <div className="grid gap-4 grid-cols-2">
+                                            <div className="space-y-2">
+                                                <Label>First Name</Label>
+                                                <Input value={data.billing.first_name} onChange={e => setData('billing', { ...data.billing, first_name: e.target.value })} required />
+                                                <InputError message={errors['billing.first_name']} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Last Name</Label>
+                                                <Input value={data.billing.last_name} onChange={e => setData('billing', { ...data.billing, last_name: e.target.value })} required />
+                                                <InputError message={errors['billing.last_name']} />
+                                            </div>
+                                            <div className="col-span-2 space-y-2">
+                                                <Label>Billing Address</Label>
+                                                <Input value={data.billing.address_line1} onChange={e => setData('billing', { ...data.billing, address_line1: e.target.value })} required />
+                                                <InputError message={errors['billing.address_line1']} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>City</Label>
+                                                <Input value={data.billing.city} onChange={e => setData('billing', { ...data.billing, city: e.target.value })} required />
+                                                <InputError message={errors['billing.city']} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Postal Code</Label>
+                                                <Input value={data.billing.postal_code} onChange={e => setData('billing', { ...data.billing, postal_code: e.target.value })} required />
+                                                <InputError message={errors['billing.postal_code']} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Country (2-Letter Code)</Label>
+                                                <Input value={data.billing.country} onChange={e => setData('billing', { ...data.billing, country: e.target.value })} maxLength={2} required />
+                                                <InputError message={errors['billing.country']} />
+                                            </div>
+                                            <div className="col-span-2 space-y-2">
+                                                <Label>Email</Label>
+                                                <Input type="email" value={data.billing.email} onChange={e => setData('billing', { ...data.billing, email: e.target.value })} required />
+                                                <InputError message={errors['billing.email']} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="space-y-2">
                                     <Label>Reference (optional)</Label>
                                     <Input value={data.reference} onChange={e => setData('reference', e.target.value)} placeholder="e.g. Salary March" />

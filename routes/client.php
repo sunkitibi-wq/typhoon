@@ -11,7 +11,14 @@ Route::middleware(['auth'])
     ->name('client.')
     ->group(function () {
         Route::get('home', function () {
-            return view('client.home');
+            $user = auth()->user();
+            $accounts = $user->accounts()->with('accountType')->get();
+            $transactions = \App\Models\Banking\Transaction::where('user_id', $user->id)
+                ->latest()
+                ->take(5)
+                ->get();
+
+            return view('client.home', compact('accounts', 'transactions'));
         })->name('home');
         // Add more client routes here.
     });

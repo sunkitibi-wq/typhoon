@@ -8,6 +8,24 @@ Route::middleware(['auth', 'role:admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
+        Route::get('home', function () {
+            $reportService = app(\App\Services\ReportService::class);
+            $data = $reportService->adminDashboard();
+
+            $pendingKycs = \App\Models\Banking\KycVerification::with('user')
+                ->where('status', 'pending')
+                ->latest()
+                ->take(5)
+                ->get();
+
+            $recentAlerts = \App\Models\Banking\MonitoringAlert::with('user', 'transaction')
+                ->latest()
+                ->take(5)
+                ->get();
+
+            return view('admin.dashboard', compact('data', 'pendingKycs', 'recentAlerts'));
+        })->name('home');
+
         Route::get('dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
         Route::get('kyc', [AdminController::class, 'kyc'])->name('kyc');
         Route::post('kyc/{kyc}/approve', [AdminController::class, 'approveKyc'])->name('kyc.approve');
