@@ -16,13 +16,15 @@ class BlockchainService
     private readonly string $network;
     private readonly ?string $projectId;
     private readonly ?string $apiKey;
+    private readonly ?string $metamaskApiKey;
 
     public function __construct()
     {
         $this->provider = config('blockchain.default', 'mock');
-        $this->network = config('blockchain.providers.infura.network', 'sepolia');
+        $this->network = config("blockchain.providers.{$this->provider}.network", 'sepolia');
         $this->projectId = config('blockchain.providers.infura.project_id');
         $this->apiKey = config('blockchain.providers.alchemy.api_key');
+        $this->metamaskApiKey = config('blockchain.providers.metamask.api_key');
     }
 
     public function generateAddress(): array
@@ -140,6 +142,10 @@ class BlockchainService
             return true;
         }
 
+        if ($this->provider === 'metamask' && $this->metamaskApiKey) {
+            return true;
+        }
+
         return false;
     }
 
@@ -238,7 +244,7 @@ class BlockchainService
 
         $endpoint = $provider['endpoint'];
         $endpoint = str_replace('{project_id}', $this->projectId ?? '', $endpoint);
-        $endpoint = str_replace('{api_key}', $this->apiKey ?? '', $endpoint);
+        $endpoint = str_replace('{api_key}', $this->provider === 'metamask' ? ($this->metamaskApiKey ?? '') : ($this->apiKey ?? ''), $endpoint);
         $endpoint = str_replace('{network}', $this->network, $endpoint);
 
         return $endpoint;

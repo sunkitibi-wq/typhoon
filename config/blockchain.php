@@ -11,6 +11,12 @@ return [
             'endpoint' => 'https://{network}.infura.io/v3/{project_id}',
         ],
 
+        'metamask' => [
+            'api_key' => env('METAMASK_API_KEY'),
+            'network' => env('BLOCKCHAIN_NETWORK', 'sepolia'),
+            'endpoint' => 'https://{network}.infura.io/v3/{api_key}',
+        ],
+
         'alchemy' => [
             'api_key' => env('ALCHEMY_API_KEY'),
             'network' => env('BLOCKCHAIN_NETWORK', 'eth-sepolia'),
