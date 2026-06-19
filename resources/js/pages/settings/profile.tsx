@@ -28,8 +28,32 @@ export default function Profile({
                 <Heading
                     variant="small"
                     title="Profile information"
-                    description="Update your name and email address"
+                    description="Update your profile details and settings"
                 />
+
+                <div className="grid gap-4 rounded-xl border p-4 bg-muted/40">
+                    <h3 className="font-semibold text-sm">Account Status & Details</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                        <div>
+                            <span className="text-muted-foreground block text-xs">KYC Verification</span>
+                            <span className="font-medium capitalize">{auth.user.kyc_level === 0 || !auth.user.kyc_level ? 'Level 0 (Unverified)' : `Level ${auth.user.kyc_level}`}</span>
+                        </div>
+                        <div>
+                            <span className="text-muted-foreground block text-xs">Account Status</span>
+                            <span className="font-medium capitalize">{auth.user.status || 'Active'}</span>
+                        </div>
+                        <div>
+                            <span className="text-muted-foreground block text-xs">Joined On</span>
+                            <span className="font-medium">
+                                {auth.user.created_at ? new Date(auth.user.created_at).toLocaleDateString(undefined, {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric'
+                                }) : 'N/A'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
 
                 <Form
                     {...ProfileController.update.form()}
@@ -76,6 +100,77 @@ export default function Profile({
                                 <InputError
                                     className="mt-2"
                                     message={errors.email}
+                                />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="phone">Phone Number</Label>
+
+                                <Input
+                                    id="phone"
+                                    type="text"
+                                    className="mt-1 block w-full"
+                                    defaultValue={auth.user.phone || ''}
+                                    name="phone"
+                                    placeholder="Phone number"
+                                />
+
+                                <InputError
+                                    className="mt-2"
+                                    message={errors.phone}
+                                />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="nationality">Nationality</Label>
+
+                                <Input
+                                    id="nationality"
+                                    type="text"
+                                    className="mt-1 block w-full"
+                                    defaultValue={auth.user.nationality || ''}
+                                    name="nationality"
+                                    placeholder="Nationality"
+                                />
+
+                                <InputError
+                                    className="mt-2"
+                                    message={errors.nationality}
+                                />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="date_of_birth">Date of Birth</Label>
+
+                                <Input
+                                    id="date_of_birth"
+                                    type="date"
+                                    className="mt-1 block w-full"
+                                    defaultValue={auth.user.date_of_birth ? auth.user.date_of_birth.split('T')[0] : ''}
+                                    name="date_of_birth"
+                                />
+
+                                <InputError
+                                    className="mt-2"
+                                    message={errors.date_of_birth}
+                                />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="country_of_residence">Country of Residence</Label>
+
+                                <Input
+                                    id="country_of_residence"
+                                    type="text"
+                                    className="mt-1 block w-full"
+                                    defaultValue={auth.user.country_of_residence || ''}
+                                    name="country_of_residence"
+                                    placeholder="Country of residence"
+                                />
+
+                                <InputError
+                                    className="mt-2"
+                                    message={errors.country_of_residence}
                                 />
                             </div>
 

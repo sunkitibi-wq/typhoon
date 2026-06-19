@@ -63,6 +63,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/crypto/withdrawals', [CryptoController::class, 'withdrawals']);
     Route::post('/crypto/withdrawals', [CryptoController::class, 'requestWithdrawal']);
     Route::post('/crypto/transactions/send', [CryptoController::class, 'sendTransaction']);
+    Route::post('/crypto/buy-fiat', [CryptoController::class, 'buyWithFiat']);
+    Route::post('/crypto/sell-fiat', [CryptoController::class, 'sellToFiat']);
 
     // Portfolio
     Route::get('/portfolio', [PortfolioController::class, 'overview']);

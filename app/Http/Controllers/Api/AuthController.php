@@ -128,6 +128,10 @@ class AuthController extends Controller
                 'phone' => $user->phone,
                 'kyc_level' => $user->kyc_level,
                 'country_of_residence' => $user->country_of_residence,
+                'nationality' => $user->nationality,
+                'date_of_birth' => $user->date_of_birth?->toDateString(),
+                'status' => $user->status,
+                'created_at' => $user->created_at?->toIso8601String(),
                 'two_factor_enabled' => $user->two_factor_enabled,
                 'accounts' => $user->accounts->map(fn($a) => [
                     'id' => $a->id,

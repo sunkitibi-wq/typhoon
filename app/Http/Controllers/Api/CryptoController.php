@@ -275,4 +275,60 @@ class CryptoController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
     }
+
+    public function buyWithFiat(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'account_id' => 'required|exists:accounts,id',
+            'crypto_code' => 'required|string|exists:crypto_currencies,code',
+            'amount' => 'required|numeric|min:1',
+            'external_address' => 'nullable|string|max:255',
+        ]);
+
+        $account = \App\Models\Banking\Account::findOrFail($validated['account_id']);
+
+        try {
+            $result = $this->cryptoService->buyWithFiat(
+                $request->user(),
+                $account,
+                $validated['crypto_code'],
+                (float) $validated['amount'],
+                $validated['external_address'] ?? null,
+            );
+
+            return response()->json([
+                'message' => 'Crypto purchased successfully',
+                'result' => $result,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
+
+    public function sellToFiat(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'account_id' => 'required|exists:accounts,id',
+            'crypto_code' => 'required|string|exists:crypto_currencies,code',
+            'amount' => 'required|numeric|min:0.00000001',
+        ]);
+
+        $account = \App\Models\Banking\Account::findOrFail($validated['account_id']);
+
+        try {
+            $result = $this->cryptoService->sellToFiat(
+                $request->user(),
+                $account,
+                $validated['crypto_code'],
+                (float) $validated['amount'],
+            );
+
+            return response()->json([
+                'message' => 'Crypto sold successfully',
+                'result' => $result,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+    }
 }

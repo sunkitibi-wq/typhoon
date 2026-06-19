@@ -56,17 +56,21 @@ export default function Crypto({ wallets, rates, orders, deposits, withdrawals, 
     const withdrawForm = useForm({ wallet_id: '', amount: '', to_address: '', action: 'request_withdrawal' });
     const depositForm = useForm({ crypto_currency_id: '', crypto_wallet_id: '', amount: '', tx_hash: '', from_address: '', action: 'record_deposit' });
     const buyFiatForm = useForm({ account_id: '', crypto_code: 'BTC', amount: '', external_address: '', action: 'buy_with_fiat' });
+    const sellFiatForm = useForm({ account_id: '', crypto_code: 'BTC', amount: '', action: 'sell_to_fiat' });
 
     const submitOrder = (e: React.FormEvent) => { e.preventDefault(); orderForm.post(route('banking.crypto')); };
     const submitWallet = (e: React.FormEvent) => { e.preventDefault(); walletForm.post(route('banking.crypto')); };
     const submitWithdraw = (e: React.FormEvent) => { e.preventDefault(); withdrawForm.post(route('banking.crypto')); };
     const submitDeposit = (e: React.FormEvent) => { e.preventDefault(); depositForm.post(route('banking.crypto')); };
     const submitBuyFiat = (e: React.FormEvent) => { e.preventDefault(); buyFiatForm.post(route('banking.crypto')); };
+    const submitSellFiat = (e: React.FormEvent) => { e.preventDefault(); sellFiatForm.post(route('banking.crypto')); };
 
     const quote = rates[0];
     const selectedRate = rates.find(r => r.pair.startsWith(orderForm.data.base_currency));
     const buyRate = rates.find(r => r.pair.startsWith(buyFiatForm.data.crypto_code));
     const selectedAccount = accounts.find(a => String(a.id) === buyFiatForm.data.account_id);
+    const sellRate = rates.find(r => r.pair.startsWith(sellFiatForm.data.crypto_code));
+    const selectedWallet = wallets.find(w => w.currency === sellFiatForm.data.crypto_code);
 
     return (
         <>
@@ -85,6 +89,7 @@ export default function Crypto({ wallets, rates, orders, deposits, withdrawals, 
                         <TabsTrigger value="deposits"><Download className="mr-2 h-4 w-4" />Deposits</TabsTrigger>
                         <TabsTrigger value="withdrawals"><Send className="mr-2 h-4 w-4" />Withdrawals</TabsTrigger>
                         <TabsTrigger value="buy"><CreditCard className="mr-2 h-4 w-4" />Buy Crypto</TabsTrigger>
+                        <TabsTrigger value="sell"><ArrowUpDown className="mr-2 h-4 w-4" />Sell Crypto</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="exchange" className="space-y-4">
@@ -406,6 +411,82 @@ export default function Crypto({ wallets, rates, orders, deposits, withdrawals, 
                                 <CardHeader><CardTitle>Your Virtual Wallets</CardTitle></CardHeader>
                                 <CardContent className="space-y-3">
                                     {wallets.length === 0 && <p className="text-sm text-muted-foreground">No wallets yet. Create one or buy crypto to get started.</p>}
+                                    {wallets.map(w => (
+                                        <div key={w.id} className="flex items-center justify-between rounded-lg border p-3">
+                                            <div className="flex items-center gap-2">
+                                                <Wallet className="size-4 text-muted-foreground" />
+                                                <span className="font-medium">{w.currency}</span>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-medium">{Number(w.balance).toFixed(8)}</p>
+                                                <p className="text-xs text-muted-foreground font-mono">{w.address.slice(0, 8)}...{w.address.slice(-4)}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </TabsContent>
+                    <TabsContent value="sell" className="space-y-4">
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <Card>
+                                <CardHeader><CardTitle><ArrowUpDown className="mr-2 inline h-4 w-4" />Sell to Fiat</CardTitle></CardHeader>
+                                <CardContent>
+                                    <form onSubmit={submitSellFiat} className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label>To Account *</Label>
+                                            <Select value={sellFiatForm.data.account_id} onValueChange={v => sellFiatForm.setData('account_id', v)}>
+                                                <SelectTrigger><SelectValue placeholder="Select EUR account" /></SelectTrigger>
+                                                <SelectContent>{accounts.filter(a => a.currency === 'EUR').map(a => (<SelectItem key={a.id} value={String(a.id)}>{a.label} (€{Number(a.balance).toLocaleString()})</SelectItem>))}</SelectContent>
+                                            </Select>
+                                            <InputError message={sellFiatForm.errors.account_id} />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label>Sell *</Label>
+                                                <Select value={sellFiatForm.data.crypto_code} onValueChange={v => sellFiatForm.setData('crypto_code', v)}>
+                                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                                    <SelectContent>{currencies.map(c => (<SelectItem key={c.code} value={c.code}>{c.code} — {c.name}</SelectItem>))}</SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Amount ({sellFiatForm.data.crypto_code}) *</Label>
+                                                <Input type="number" step="any" min="0.00000001" value={sellFiatForm.data.amount} onChange={e => sellFiatForm.setData('amount', e.target.value)} required />
+                                                <InputError message={sellFiatForm.errors.amount} />
+                                            </div>
+                                        </div>
+                                        {selectedWallet && (
+                                            <div className="text-xs text-muted-foreground">
+                                                Available: {Number(selectedWallet.balance).toFixed(8)} {selectedWallet.currency}
+                                            </div>
+                                        )}
+                                        {sellRate && parseFloat(sellFiatForm.data.amount || '0') > 0 && (
+                                            <div className="rounded-lg bg-muted p-3 text-sm space-y-1">
+                                                <div className="flex justify-between">
+                                                    <span>Rate</span>
+                                                    <span>1 {sellFiatForm.data.crypto_code} = €{Number(sellRate.mid).toFixed(2)}</span>
+                                                </div>
+                                                <div className="flex justify-between font-medium">
+                                                    <span>You receive</span>
+                                                    <span>~€{(parseFloat(sellFiatForm.data.amount || '0') * sellRate.mid * 0.998).toFixed(2)}</span>
+                                                </div>
+                                                <div className="flex justify-between text-xs text-muted-foreground">
+                                                    <span>Fee (0.2%)</span>
+                                                    <span>€{(parseFloat(sellFiatForm.data.amount || '0') * sellRate.mid * 0.002).toFixed(2)}</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <Button type="submit" disabled={sellFiatForm.processing} className="w-full bg-red-600 hover:bg-red-700">
+                                            <ArrowUpDown className="mr-2 h-4 w-4" />Sell {sellFiatForm.data.crypto_code}
+                                        </Button>
+                                    </form>
+                                </CardContent>
+                            </Card>
+
+                            <Card>
+                                <CardHeader><CardTitle>Your Virtual Wallets</CardTitle></CardHeader>
+                                <CardContent className="space-y-3">
+                                    {wallets.length === 0 && <p className="text-sm text-muted-foreground">No wallets yet.</p>}
                                     {wallets.map(w => (
                                         <div key={w.id} className="flex items-center justify-between rounded-lg border p-3">
                                             <div className="flex items-center gap-2">

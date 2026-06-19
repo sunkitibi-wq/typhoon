@@ -342,12 +342,20 @@ class CryptoExchangeService
             $accountLocked->decrement('available_balance', $fiatAmount);
             $accountLocked->decrement('ledger_balance', $fiatAmount);
 
-            $this->transactionService->deposit(
-                $accountLocked,
-                $fiatAmount,
-                "crypto_purchase_{$cryptoCode}",
-                'CRYPTO-BUY-' . strtoupper(Str::random(10)),
-            );
+            \App\Models\Banking\Transaction::create([
+                'reference' => 'CRYPTO-BUY-' . strtoupper(Str::random(10)),
+                'type' => 'withdrawal',
+                'status' => 'completed',
+                'debit_account_id' => $accountLocked->id,
+                'user_id' => $user->id,
+                'amount' => $fiatAmount,
+                'fee' => 0,
+                'net_amount' => $fiatAmount,
+                'currency' => 'EUR',
+                'description' => "Crypto purchase ({$cryptoCode})",
+                'category' => 'crypto',
+                'completed_at' => now(),
+            ]);
 
             $currency = CryptoCurrency::where('code', $cryptoCode)->firstOrFail();
 
@@ -409,6 +417,90 @@ class CryptoExchangeService
                 'wallet_id' => $walletLocked->id,
                 'tx_hash' => $txHash,
                 'to_external' => $externalAddress,
+            ];
+        });
+    }
+
+    public function sellToFiat(User $user, Account $account, string $cryptoCode, float $cryptoAmount): array
+    {
+        if ($account->user_id !== $user->id) {
+            throw new \RuntimeException('Account does not belong to user');
+        }
+
+        if ($account->currency !== 'EUR') {
+            throw new \RuntimeException('Only EUR accounts can be used for crypto sales');
+        }
+
+        $rate = ExchangeRate::where('base_currency', $cryptoCode)
+            ->where('quote_currency', 'EUR')
+            ->firstOrFail();
+
+        $cryptoPrice = $rate->mid_rate;
+        $fiatAmount = $cryptoAmount * $cryptoPrice;
+        $fee = $fiatAmount * 0.002;
+        $netFiat = $fiatAmount - $fee;
+
+        $currency = CryptoCurrency::where('code', $cryptoCode)->firstOrFail();
+
+        return DB::transaction(function () use ($user, $account, $cryptoCode, $cryptoAmount, $fiatAmount, $netFiat, $fee, $cryptoPrice, $currency) {
+            $wallet = CryptoWallet::where('user_id', $user->id)
+                ->where('crypto_currency_id', $currency->id)
+                ->firstOrFail();
+
+            $walletLocked = CryptoWallet::where('id', $wallet->id)->lockForUpdate()->firstOrFail();
+
+            if ($walletLocked->balance < $cryptoAmount) {
+                throw new \RuntimeException('Insufficient crypto balance');
+            }
+
+            $walletLocked->decrement('balance', $cryptoAmount);
+
+            $accountLocked = Account::where('id', $account->id)->lockForUpdate()->firstOrFail();
+            $accountLocked->increment('balance', $netFiat);
+            $accountLocked->increment('available_balance', $netFiat);
+            $accountLocked->increment('ledger_balance', $netFiat);
+
+            \App\Models\Banking\Transaction::create([
+                'reference' => 'CRYPTO-SELL-' . strtoupper(Str::random(10)),
+                'type' => 'deposit',
+                'status' => 'completed',
+                'credit_account_id' => $accountLocked->id,
+                'user_id' => $user->id,
+                'amount' => $netFiat,
+                'fee' => 0,
+                'net_amount' => $netFiat,
+                'currency' => 'EUR',
+                'description' => "Crypto sale ({$cryptoCode})",
+                'category' => 'crypto',
+                'completed_at' => now(),
+            ]);
+
+            CryptoOrder::create([
+                'order_number' => $this->generateOrderNumber(),
+                'user_id' => $user->id,
+                'order_type' => 'market',
+                'side' => 'sell',
+                'base_currency' => $cryptoCode,
+                'quote_currency' => 'EUR',
+                'amount' => $cryptoAmount,
+                'filled_amount' => $cryptoAmount,
+                'price' => $cryptoPrice,
+                'fee' => $fee,
+                'fee_rate' => 0.002,
+                'total' => $fiatAmount,
+                'status' => 'filled',
+                'time_in_force' => 'GTC',
+                'filled_at' => now(),
+            ]);
+
+            return [
+                'fiat_amount' => $fiatAmount,
+                'net_fiat' => $netFiat,
+                'crypto_amount' => $cryptoAmount,
+                'crypto_code' => $cryptoCode,
+                'price_per_unit' => $cryptoPrice,
+                'fee' => $fee,
+                'wallet_id' => $walletLocked->id,
             ];
         });
     }

@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, CreditCard, ArrowUpRight, ArrowDownRight, Snowflake, XCircle, Play } from 'lucide-react';
+import { ArrowLeft, CreditCard, ArrowUpRight, ArrowDownRight, Snowflake, XCircle, Play, ArrowLeftRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,8 @@ interface Transaction {
     currency: string;
     description: string;
     status: string;
+    debit_account_id?: number;
+    credit_account_id?: number;
     created_at: string;
 }
 
@@ -126,35 +128,40 @@ export default function AccountDetail({ account, transactions }: { account: Acco
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-3">
-                            {transactions.map(tx => (
-                                <div key={tx.id} className="flex items-center justify-between rounded-lg border p-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className={`flex size-8 items-center justify-center rounded-full ${
-                                            tx.type === 'deposit' ? 'bg-emerald-100 dark:bg-emerald-900/20' :
-                                            tx.type === 'withdrawal' ? 'bg-rose-100 dark:bg-rose-900/20' : 'bg-blue-100 dark:bg-blue-900/20'
-                                        }`}>
-                                            {tx.type === 'deposit' ? <ArrowUpRight className="size-4 text-emerald-600" /> :
-                                             tx.type === 'withdrawal' ? <ArrowDownRight className="size-4 text-rose-600" /> :
-                                             <ArrowUpRight className="size-4 text-blue-600" />}
+                            {transactions.map(tx => {
+                                const isCredit = tx.type === 'deposit' || (tx.type === 'transfer' && tx.credit_account_id === account.id);
+                                const isDebit = tx.type === 'withdrawal' || (tx.type === 'transfer' && tx.debit_account_id === account.id);
+                                const sign = isCredit ? '+' : '-';
+                                return (
+                                    <div key={tx.id} className="flex items-center justify-between rounded-lg border p-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`flex size-8 items-center justify-center rounded-full ${
+                                                isCredit ? 'bg-emerald-100 dark:bg-emerald-900/20' :
+                                                isDebit ? 'bg-rose-100 dark:bg-rose-900/20' : 'bg-blue-100 dark:bg-blue-900/20'
+                                            }`}>
+                                                {isCredit ? <ArrowUpRight className="size-4 text-emerald-600" /> :
+                                                 isDebit ? <ArrowDownRight className="size-4 text-rose-600" /> :
+                                                 <ArrowLeftRight className="size-4 text-blue-600" />}
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-medium">{tx.description || tx.type}</p>
+                                                <p className="text-xs text-muted-foreground font-mono">{tx.reference}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="text-sm font-medium">{tx.description || tx.type}</p>
-                                            <p className="text-xs text-muted-foreground font-mono">{tx.reference}</p>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-sm font-bold ${
+                                                isCredit ? 'text-emerald-600' :
+                                                isDebit ? 'text-rose-600' : ''
+                                            }`}>
+                                                {sign}&euro;{tx.amount.toLocaleString()}
+                                            </span>
+                                            <Badge variant={tx.status === 'completed' ? 'secondary' : 'outline'} className="text-[10px]">
+                                                {tx.status}
+                                            </Badge>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className={`text-sm font-bold ${
-                                            tx.type === 'deposit' ? 'text-emerald-600' :
-                                            tx.type === 'withdrawal' ? 'text-rose-600' : ''
-                                        }`}>
-                                            {tx.type === 'deposit' ? '+' : '-'}&euro;{tx.amount.toLocaleString()}
-                                        </span>
-                                        <Badge variant={tx.status === 'completed' ? 'secondary' : 'outline'} className="text-[10px]">
-                                            {tx.status}
-                                        </Badge>
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                             {transactions.length === 0 && (
                                 <p className="py-8 text-center text-sm text-muted-foreground">No transactions on this account</p>
                             )}

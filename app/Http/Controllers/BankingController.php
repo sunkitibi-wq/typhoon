@@ -91,6 +91,8 @@ class BankingController extends Controller
                 'currency' => $t->currency,
                 'description' => $t->description,
                 'status' => $t->status,
+                'debit_account_id' => $t->debit_account_id,
+                'credit_account_id' => $t->credit_account_id,
                 'created_at' => $t->created_at,
             ]),
             'total_balance' => (float) $accounts->sum('balance'),
@@ -159,6 +161,8 @@ class BankingController extends Controller
                 'currency' => $t->currency,
                 'description' => $t->description,
                 'status' => $t->status,
+                'debit_account_id' => $t->debit_account_id,
+                'credit_account_id' => $t->credit_account_id,
                 'created_at' => $t->created_at,
             ]),
         ]);
@@ -414,6 +418,7 @@ class BankingController extends Controller
                 'request_withdrawal' => $this->cryptoRequestWithdrawal($request),
                 'record_deposit' => $this->cryptoRecordDeposit($request),
                 'buy_with_fiat' => $this->cryptoBuyWithFiat($request),
+                'sell_to_fiat' => $this->cryptoSellToFiat($request),
                 default => back()->withErrors(['action' => 'Invalid action']),
             };
         }
@@ -621,6 +626,32 @@ class BankingController extends Controller
             if ($result['to_external']) {
                 $message .= " and sent to external wallet";
             }
+
+            return redirect()->route('banking.crypto')->with('success', $message);
+        } catch (\Exception $e) {
+            return back()->withErrors(['amount' => $e->getMessage()]);
+        }
+    }
+
+    private function cryptoSellToFiat(Request $request)
+    {
+        $validated = $request->validate([
+            'account_id' => 'required|exists:accounts,id',
+            'crypto_code' => 'required|string|exists:crypto_currencies,code',
+            'amount' => 'required|numeric|min:0.00000001',
+        ]);
+
+        $account = Account::findOrFail($validated['account_id']);
+
+        try {
+            $result = $this->cryptoService->sellToFiat(
+                $request->user(),
+                $account,
+                $validated['crypto_code'],
+                $validated['amount'],
+            );
+
+            $message = "Sold {$result['crypto_amount']} {$result['crypto_code']} for €{$result['net_fiat']}";
 
             return redirect()->route('banking.crypto')->with('success', $message);
         } catch (\Exception $e) {
