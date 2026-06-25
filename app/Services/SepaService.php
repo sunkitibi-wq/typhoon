@@ -46,6 +46,8 @@ class SepaService
             ]);
 
             $baasResponse = $this->baasService->initiateCreditTransfer([
+                'external_person_id' => $debitAccount->user->solaris_person_id ?? null,
+                'external_account_id' => $debitAccount->solaris_account_id ?? null,
                 'debtor_iban' => $debitAccount->iban,
                 'debtor_name' => $debitAccount->user->name ?? 'Unknown',
                 'creditor_iban' => $creditorIban,
@@ -121,6 +123,8 @@ class SepaService
             ]);
 
             $baasResponse = $this->baasService->initiateDirectDebit([
+                'external_person_id' => $creditAccount->user->solaris_person_id ?? null,
+                'external_account_id' => $creditAccount->solaris_account_id ?? null,
                 'credit_iban' => $creditAccount->iban,
                 'credit_name' => $creditAccount->user->name ?? 'Unknown',
                 'debtor_iban' => $debtorIban,

@@ -27,6 +27,12 @@ const routes: Record<string, string> = {
     'banking.loans': '/banking/loans',
     'banking.loans.show': '/banking/loans/{loan}',
     'banking.loans.pay': '/banking/loans/{loan}/pay',
+    'banking.pos': '/banking/pos',
+    'banking.pos.terminals.store': '/banking/pos/terminals',
+    'banking.pos.terminals.toggle': '/banking/pos/terminals/{terminal}/toggle',
+    'banking.pos.terminals.configure': '/banking/pos/terminals/{terminal}/configure',
+    'banking.pos.terminals.destroy': '/banking/pos/terminals/{terminal}',
+    'banking.pos.transactions.refund': '/banking/pos/transactions/{posTransaction}/refund',
 
     // Admin
     'admin.dashboard': '/admin/dashboard',

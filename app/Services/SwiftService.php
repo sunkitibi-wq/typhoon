@@ -34,6 +34,8 @@ class SwiftService
         ]);
 
         $baasResponse = $this->baasService->initiateCreditTransfer([
+            'external_person_id' => $user->solaris_person_id ?? $debitAccount->user->solaris_person_id ?? null,
+            'external_account_id' => $debitAccount->solaris_account_id ?? null,
             'debtor_iban' => $debitAccount->iban,
             'debtor_name' => $user->name,
             'creditor_iban' => $beneficiaryAccount,

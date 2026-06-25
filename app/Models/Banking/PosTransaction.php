@@ -9,7 +9,8 @@ class PosTransaction extends Model
 {
     protected $fillable = [
         'transaction_id', 'pos_terminal_id', 'card_brand', 'card_last4',
-        'payment_method', 'terminal_reference', 'amount', 'currency',
+        'payment_method', 'payment_type', 'crypto_currency', 'crypto_amount',
+        'crypto_address', 'tx_hash', 'terminal_reference', 'amount', 'currency',
         'status', 'failure_reason',
     ];
 
@@ -17,6 +18,7 @@ class PosTransaction extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'crypto_amount' => 'decimal:8',
         ];
     }
 

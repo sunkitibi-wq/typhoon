@@ -56,6 +56,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('pos', [BankingController::class, 'posDashboard'])->name('pos');
         Route::post('pos/terminals', [BankingController::class, 'pairTerminal'])->name('pos.terminals.store');
         Route::post('pos/terminals/{terminal}/toggle', [BankingController::class, 'toggleTerminal'])->name('pos.terminals.toggle');
+        Route::post('pos/terminals/{terminal}/configure', [BankingController::class, 'configureTerminal'])->name('pos.terminals.configure');
         Route::delete('pos/terminals/{terminal}', [BankingController::class, 'deleteTerminal'])->name('pos.terminals.destroy');
         Route::post('pos/transactions/{posTransaction}/refund', [BankingController::class, 'refundPosTransaction'])->name('pos.transactions.refund');
     });

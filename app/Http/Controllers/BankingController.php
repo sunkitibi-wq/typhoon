@@ -1252,8 +1252,14 @@ class BankingController extends Controller
             'terminals' => $terminals->map(fn($t) => [
                 'id' => $t->id,
                 'serial_number' => $t->serial_number,
+                'oracle_terminal_id' => $t->oracle_terminal_id,
                 'label' => $t->label,
                 'model' => $t->model,
+                'crypto_processor_enabled' => (bool) $t->crypto_processor_enabled,
+                'default_crypto_currency' => $t->default_crypto_currency,
+                'settlement_mode' => $t->settlement_mode,
+                'oracle_api_url' => $t->oracle_api_url,
+                'oracle_api_key' => $t->oracle_api_key,
                 'status' => $t->status,
                 'account_number' => $t->account?->account_number,
                 'account_label' => $t->account?->label,
@@ -1269,6 +1275,11 @@ class BankingController extends Controller
                 'card_brand' => $pt->card_brand,
                 'card_last4' => $pt->card_last4,
                 'payment_method' => $pt->payment_method,
+                'payment_type' => $pt->payment_type,
+                'crypto_currency' => $pt->crypto_currency,
+                'crypto_amount' => (float) $pt->crypto_amount,
+                'crypto_address' => $pt->crypto_address,
+                'tx_hash' => $pt->tx_hash,
                 'status' => $pt->status,
                 'created_at' => $pt->created_at,
             ]),
@@ -1301,6 +1312,31 @@ class BankingController extends Controller
             return redirect()->route('banking.pos')->with('success', 'Terminal paired successfully');
         } catch (\Exception $e) {
             return back()->withErrors(['serial_number' => $e->getMessage()]);
+        }
+    }
+
+    public function configureTerminal(\App\Models\Banking\PosTerminal $terminal, Request $request)
+    {
+        if ($terminal->user_id !== $request->user()->id) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'oracle_terminal_id' => 'required|string|max:50',
+            'crypto_processor_enabled' => 'required|boolean',
+            'default_crypto_currency' => 'required|string|in:BTC,ETH,USDT,USDC',
+            'settlement_mode' => 'required|string|in:fiat,crypto',
+            'oracle_api_url' => 'nullable|url|max:255',
+            'oracle_api_key' => 'nullable|string|max:255',
+        ]);
+
+        try {
+            $service = app(\App\Services\OraclePosIntegrationService::class);
+            $service->configureTerminal($terminal, $validated);
+
+            return redirect()->route('banking.pos')->with('success', 'Terminal configuration updated successfully');
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
         }
     }
 

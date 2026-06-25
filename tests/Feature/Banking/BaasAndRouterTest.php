@@ -264,4 +264,55 @@ class BaasAndRouterTest extends TestCase
             'description' => 'Potential AML structuring pattern detected',
         ]);
     }
+
+    public function test_webhook_event_job_processes_incoming_payment_deposit()
+    {
+        $initialBalance = $this->fromAccount->balance;
+
+        $webhookEvent = WebhookEvent::create([
+            'event_type' => 'transfer',
+            'source' => 'solarisbank',
+            'payload' => [
+                'external_id' => 'tx_incoming_external_123',
+                'status' => 'completed',
+                'recipient_iban' => $this->fromAccount->iban,
+                'amount' => [
+                    'value' => 2500.0,
+                    'currency' => 'EUR',
+                ],
+                'sender_name' => 'Jane Sender',
+                'sender_iban' => 'DE89370400440532019999',
+                'description' => 'Freelance payment',
+            ],
+            'status' => 'pending'
+        ]);
+
+        $job = new ProcessWebhookEvent($webhookEvent);
+        $job->handle();
+
+        $this->fromAccount->refresh();
+        $webhookEvent->refresh();
+
+        // 10000 + 2500 = 12500
+        $this->assertEquals(12500.0, (float) $this->fromAccount->balance);
+        $this->assertEquals('completed', $webhookEvent->status);
+
+        $this->assertDatabaseHas('transactions', [
+            'type' => 'deposit',
+            'status' => 'completed',
+            'credit_account_id' => $this->fromAccount->id,
+            'amount' => 2500.0,
+            'currency' => 'EUR',
+            'description' => 'Freelance payment',
+        ]);
+
+        $tx = Transaction::where('credit_account_id', $this->fromAccount->id)
+            ->where('type', 'deposit')
+            ->first();
+
+        $this->assertNotNull($tx);
+        $this->assertEquals('tx_incoming_external_123', $tx->metadata['baas_external_id']);
+        $this->assertEquals('Jane Sender', $tx->metadata['sender_name']);
+        $this->assertEquals('DE89370400440532019999', $tx->metadata['sender_iban']);
+    }
 }

@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\LoanController;
 use App\Http\Controllers\Api\DepositController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PosController;
+use App\Http\Controllers\Api\OraclePosController;
 use Illuminate\Support\Facades\Route;
 
 // Public routes
@@ -78,6 +79,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/pos/terminals/{terminal}/toggle', [PosController::class, 'toggleTerminal']);
     Route::get('/pos/transactions', [PosController::class, 'indexTransactions']);
     Route::post('/pos/transactions/{posTransaction}/refund', [PosController::class, 'refundTransaction']);
+
+    // Oracle POS & Crypto smartPOS
+    Route::post('/pos/oracle/configure-terminal', [OraclePosController::class, 'configureTerminal']);
+    Route::post('/pos/oracle/charge', [OraclePosController::class, 'charge']);
+    Route::get('/pos/oracle/charge/{reference}/status', [OraclePosController::class, 'status']);
+    Route::post('/pos/oracle/simulate-payment', [OraclePosController::class, 'simulatePayment']);
 
     // SEPA
     Route::get('/sepa/transfers', [SepaController::class, 'index']);

@@ -5,6 +5,8 @@ namespace App\Jobs;
 use App\Models\Banking\WebhookEvent;
 use App\Models\Banking\Transaction;
 use App\Models\Banking\MonitoringAlert;
+use App\Models\Banking\Account;
+use App\Services\TransactionService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -93,7 +95,70 @@ class ProcessWebhookEvent implements ShouldQueue
         $transaction = Transaction::where('metadata->baas_external_id', $externalId)->first();
 
         if (!$transaction) {
-            Log::info("ProcessWebhookEvent: No transaction found matching external ID: {$externalId}");
+            // Check if this is an incoming transaction by inspecting recipient_iban
+            $originalPayload = $this->event->payload;
+            $solarisPayload = $originalPayload['payload'] ?? [];
+            
+            $recipientIban = $originalPayload['recipient_iban'] 
+                ?? $originalPayload['creditor_iban'] 
+                ?? $originalPayload['beneficiary_iban'] 
+                ?? $solarisPayload['recipient_iban'] 
+                ?? $solarisPayload['creditor_iban'] 
+                ?? null;
+
+            if ($recipientIban) {
+                $account = Account::where('iban', $recipientIban)->first();
+                if ($account) {
+                    // Extract amount, currency, sender information, etc.
+                    $amount = $originalPayload['amount']['value'] 
+                        ?? $originalPayload['amount'] 
+                        ?? $solarisPayload['amount']['value'] 
+                        ?? $solarisPayload['amount'] 
+                        ?? null;
+                        
+                    if ($amount !== null) {
+                        $amount = (float) $amount;
+                        $senderName = $originalPayload['sender_name'] 
+                            ?? $originalPayload['debtor_name'] 
+                            ?? $solarisPayload['sender_name'] 
+                            ?? $solarisPayload['debtor_name'] 
+                            ?? 'Unknown Sender';
+                            
+                        $description = $originalPayload['description'] 
+                            ?? $originalPayload['remittance_info'] 
+                            ?? $solarisPayload['description'] 
+                            ?? $solarisPayload['remittance_info'] 
+                            ?? "Incoming transfer from {$senderName}";
+
+                        $transactionService = app(TransactionService::class);
+                        
+                        $tx = $transactionService->deposit(
+                            $account, 
+                            $amount, 
+                            'bank_transfer', 
+                            $externalId
+                        );
+                        
+                        $tx->update([
+                            'description' => $description,
+                            'metadata' => array_merge($tx->metadata ?? [], [
+                                'baas_external_id' => $externalId,
+                                'sender_name' => $senderName,
+                                'sender_iban' => $originalPayload['sender_iban'] 
+                                    ?? $originalPayload['debtor_iban'] 
+                                    ?? $solarisPayload['sender_iban'] 
+                                    ?? $solarisPayload['debtor_iban'] 
+                                    ?? null,
+                            ])
+                        ]);
+                        
+                        Log::info("ProcessWebhookEvent: Created incoming deposit transaction {$tx->id} for account {$account->id}");
+                        return;
+                    }
+                }
+            }
+
+            Log::info("ProcessWebhookEvent: No transaction or recipient account found matching external ID: {$externalId}");
             return;
         }
 
