@@ -173,7 +173,7 @@ class AuthController extends Controller
             Log::error("Failed to send password reset email: " . $e->getMessage());
         }
 
-        Log::info("Password reset OTP for {$validated['email']}: {$code}");
+        Log::info("Password reset OTP sent to {$validated['email']}");
 
         return response()->json(['message' => 'Reset code has been sent to your email.']);
     }

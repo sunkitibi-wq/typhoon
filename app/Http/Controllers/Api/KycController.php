@@ -21,9 +21,8 @@ class KycController extends Controller
     public function submit(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'kyc_level' => 'nullable|string|in:tier_1,tier_2,tier_3',
             'id_type' => 'nullable|string|in:passport,national_id,drivers_license',
-            'id_number' => 'nullable|string',
+            'id_number' => 'nullable|string|max:50',
             'id_expiry_date' => 'nullable|date',
             'country' => 'required|string|size:2',
             'nationality' => 'nullable|string|size:2',

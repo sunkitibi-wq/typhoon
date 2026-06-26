@@ -38,6 +38,11 @@ const bankingNavItems: NavItem[] = [
     {
         title: 'Accounts',
         href: '/banking/accounts',
+        icon: Building2,
+    },
+    {
+        title: 'Cards',
+        href: '/banking/cards',
         icon: CreditCard,
     },
     {

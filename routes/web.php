@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\BankingController;
 use App\Http\Controllers\CorporateController;
+use App\Http\Controllers\CardController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
@@ -59,6 +60,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('pos/terminals/{terminal}/configure', [BankingController::class, 'configureTerminal'])->name('pos.terminals.configure');
         Route::delete('pos/terminals/{terminal}', [BankingController::class, 'deleteTerminal'])->name('pos.terminals.destroy');
         Route::post('pos/transactions/{posTransaction}/refund', [BankingController::class, 'refundPosTransaction'])->name('pos.transactions.refund');
+
+        // Cards Management
+        Route::get('cards', [CardController::class, 'index'])->name('cards');
+        Route::post('cards', [CardController::class, 'store'])->name('cards.store');
+        Route::post('cards/{card}/toggle', [CardController::class, 'toggleStatus'])->name('cards.toggle');
+        Route::post('cards/{card}/pin', [CardController::class, 'setPin'])->name('cards.pin');
     });
 
     Route::prefix('webhooks')->name('webhooks.')->group(function () {

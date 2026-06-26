@@ -17,11 +17,11 @@ use App\Http\Controllers\Api\PosController;
 use App\Http\Controllers\Api\OraclePosController;
 use Illuminate\Support\Facades\Route;
 
-// Public routes
-Route::post('/auth/login', [AuthController::class, 'login']);
-Route::post('/auth/register', [AuthController::class, 'register']);
-Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
-Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
+// Public routes (with rate limiting)
+Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:5,1');
+Route::post('/auth/register', [AuthController::class, 'register'])->middleware('throttle:3,60');
+Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:3,60');
+Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:5,15');
 
 Route::get('/account-types', [AccountController::class, 'getAccountTypes']);
 Route::get('/crypto/currencies', [CryptoController::class, 'currencies']);
@@ -47,7 +47,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // KYC
     Route::get('/kyc/status', [KycController::class, 'status']);
     Route::post('/kyc/submit', [KycController::class, 'submit']);
-    Route::post('/kyc/documents', [KycController::class, 'uploadDocument']);
+    Route::post('/kyc/documents', [KycController::class, 'uploadDocument'])->middleware('throttle:10,60');
 
     // Beneficiaries
     Route::apiResource('beneficiaries', BeneficiaryController::class);

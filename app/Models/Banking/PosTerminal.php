@@ -15,6 +15,11 @@ class PosTerminal extends Model
         'oracle_api_url', 'oracle_api_key', 'status', 'pairing_code', 'paired_at', 'last_active_at',
     ];
 
+    protected $hidden = [
+        'oracle_api_key',
+        'pairing_code',
+    ];
+
     protected function casts(): array
     {
         return [

@@ -175,6 +175,12 @@ class CryptoController extends Controller
             'from_address' => 'nullable|string|max:255',
         ]);
 
+        $wallet = CryptoWallet::findOrFail($validated['crypto_wallet_id']);
+
+        if ($wallet->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
         try {
             $deposit = $this->cryptoService->recordDeposit(array_merge($validated, [
                 'user_id' => $request->user()->id,
@@ -204,7 +210,7 @@ class CryptoController extends Controller
         $validated = $request->validate([
             'wallet_id' => 'required|exists:crypto_wallets,id',
             'amount' => 'required|numeric|min:0.00000001',
-            'to_address' => 'required|string|max:255',
+            'to_address' => 'required|string|max:255|regex:/^(0x[a-fA-F0-9]{40}|[13][a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[a-zA-HJ-NP-Z0-9]{25,39})$/',
         ]);
 
         $wallet = CryptoWallet::findOrFail($validated['wallet_id']);
@@ -231,7 +237,7 @@ class CryptoController extends Controller
         $validated = $request->validate([
             'wallet_id' => 'required|exists:crypto_wallets,id',
             'amount' => 'required|numeric|min:0.00000001',
-            'to_address' => 'required|string|max:255',
+            'to_address' => 'required|string|max:255|regex:/^(0x[a-fA-F0-9]{40}|[13][a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[a-zA-HJ-NP-Z0-9]{25,39})$/',
             'gas_limit' => 'nullable|integer|min:21000',
             'gas_price' => 'nullable|string|max:255',
         ]);
@@ -282,7 +288,7 @@ class CryptoController extends Controller
             'account_id' => 'required|exists:accounts,id',
             'crypto_code' => 'required|string|exists:crypto_currencies,code',
             'amount' => 'required|numeric|min:1',
-            'external_address' => 'nullable|string|max:255',
+            'external_address' => 'nullable|string|max:255|regex:/^(0x[a-fA-F0-9]{40}|[13][a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[a-zA-HJ-NP-Z0-9]{25,39})$/',
         ]);
 
         $account = \App\Models\Banking\Account::findOrFail($validated['account_id']);

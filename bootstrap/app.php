@@ -29,5 +29,23 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->renderable(function (\Throwable $e, \Illuminate\Http\Request $request) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                \Illuminate\Support\Facades\Log::error($e);
+
+                if ($e instanceof \Illuminate\Validation\ValidationException) {
+                    return null;
+                }
+
+                if ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpException) {
+                    return response()->json([
+                        'message' => $e->getMessage() ?: 'Server error',
+                    ], $e->getStatusCode());
+                }
+
+                return response()->json(['message' => 'Server error'], 500);
+            }
+
+            return null;
+        });
     })->create();

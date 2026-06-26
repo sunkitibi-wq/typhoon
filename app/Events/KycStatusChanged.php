@@ -3,6 +3,7 @@
 namespace App\Events;
 
 use App\Models\Banking\KycVerification;
+use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;

@@ -16,6 +16,7 @@ class Account extends Model
         'user_id', 'account_type_id', 'account_number', 'iban', 'swift_bic',
         'currency', 'balance', 'available_balance', 'ledger_balance',
         'status', 'label', 'is_default', 'is_joint', 'closed_at',
+        'solaris_account_id',
     ];
 
     protected $appends = ['number'];

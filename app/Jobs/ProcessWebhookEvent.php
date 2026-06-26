@@ -38,10 +38,15 @@ class ProcessWebhookEvent implements ShouldQueue
                 $status = 'failed';
             }
 
+            $bookingType = $solarisPayload['booking_type'] ?? null;
+            $chargeDetails = $solarisPayload['charge_details'] ?? null;
+
             $payload = [
                 'external_id' => $payload['resource_id'] ?? $solarisPayload['id'] ?? null,
                 'status' => $status,
                 'failure_reason' => $solarisPayload['description'] ?? $solarisPayload['failure_reason'] ?? 'Solarisbank mutation booking failed',
+                'booking_type' => $bookingType,
+                'charge_details' => $chargeDetails,
             ];
             
             $this->event->event_type = 'transfer';
@@ -135,7 +140,7 @@ class ProcessWebhookEvent implements ShouldQueue
                         $tx = $transactionService->deposit(
                             $account, 
                             $amount, 
-                            'bank_transfer', 
+                            ($payload['booking_type'] ?? null) === 'TARGET2_CREDIT_TRANSFER' ? 'target2_transfer' : 'bank_transfer', 
                             $externalId
                         );
                         
@@ -149,6 +154,8 @@ class ProcessWebhookEvent implements ShouldQueue
                                     ?? $solarisPayload['sender_iban'] 
                                     ?? $solarisPayload['debtor_iban'] 
                                     ?? null,
+                                'booking_type' => $payload['booking_type'] ?? null,
+                                'charge_details' => $payload['charge_details'] ?? null,
                             ])
                         ]);
                         
@@ -171,6 +178,10 @@ class ProcessWebhookEvent implements ShouldQueue
             $transaction->update([
                 'status' => 'completed',
                 'completed_at' => now(),
+                'metadata' => array_merge($transaction->metadata ?? [], [
+                    'booking_type' => $payload['booking_type'] ?? null,
+                    'charge_details' => $payload['charge_details'] ?? null,
+                ]),
             ]);
         } elseif ($status === 'failed') {
             $failureReason = $payload['failure_reason'] ?? 'BaaS external transfer failed';

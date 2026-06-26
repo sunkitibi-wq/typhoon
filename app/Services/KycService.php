@@ -17,7 +17,7 @@ class KycService
             $verification = KycVerification::updateOrCreate(
                 ['user_id' => $user->id],
                 [
-                    'kyc_level' => $data['kyc_level'] ?? 'tier_1',
+                    'kyc_level' => 'tier_1',
                     'status' => 'pending',
                     'id_type' => $data['id_type'] ?? null,
                     'id_number' => $data['id_number'] ?? null,
@@ -63,9 +63,34 @@ class KycService
                 'verified_by' => $admin->id,
             ]);
 
-            $verification->user()->update([
+            $user = $verification->user;
+            $user->update([
                 'kyc_level' => $verification->kyc_level,
             ]);
+
+            // If the user doesn't have a solaris_person_id, create it via BaasService
+            if (!$user->solaris_person_id) {
+                $baasService = app(\App\Services\BaasService::class);
+                $res = $baasService->createPerson([
+                    'first_name' => explode(' ', $user->name, 2)[0] ?? $user->name,
+                    'last_name' => explode(' ', $user->name, 2)[1] ?? $user->name,
+                    'email' => $user->email,
+                    'date_of_birth' => $verification->date_of_birth,
+                    'country' => $verification->country,
+                    'nationality' => $verification->nationality,
+                    'phone_number' => $user->phone_number ?? '+491701234567',
+                    'address_line1' => $verification->address_line1,
+                    'address_line2' => $verification->address_line2,
+                    'postal_code' => $verification->postal_code,
+                    'city' => $verification->city,
+                ]);
+
+                if ($res['success'] && isset($res['id'])) {
+                    $user->update(['solaris_person_id' => $res['id']]);
+                } else {
+                    \Illuminate\Support\Facades\Log::error('BaaS: Failed to create person on KYC approval: ' . ($res['error'] ?? 'Unknown error'));
+                }
+            }
 
             $verification->documents()->update(['status' => 'approved']);
             

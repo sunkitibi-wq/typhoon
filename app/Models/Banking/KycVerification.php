@@ -14,7 +14,7 @@ class KycVerification extends Model
         'id_expiry_date', 'country', 'nationality', 'date_of_birth',
         'address_line1', 'address_line2', 'city', 'state', 'postal_code',
         'source_of_funds', 'occupation', 'employer', 'annual_income_range',
-        'verified_at', 'verified_by', 'rejection_reason',
+        'rejection_reason',
     ];
 
     protected function casts(): array

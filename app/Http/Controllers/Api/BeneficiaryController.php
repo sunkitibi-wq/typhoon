@@ -16,6 +16,15 @@ class BeneficiaryController extends Controller
         return response()->json(['beneficiaries' => $beneficiaries]);
     }
 
+    public function show(Beneficiary $beneficiary, Request $request): JsonResponse
+    {
+        if ($beneficiary->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        return response()->json(['beneficiary' => $beneficiary]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -25,7 +34,7 @@ class BeneficiaryController extends Controller
             'bank_name' => 'nullable|string|max:255',
             'bank_country' => 'nullable|string|size:2',
             'email' => 'nullable|email',
-            'notes' => 'nullable|string',
+            'notes' => 'nullable|string|max:1000',
         ]);
 
         $beneficiary = $request->user()->beneficiaries()->create($validated);
@@ -45,7 +54,7 @@ class BeneficiaryController extends Controller
             'bic' => 'nullable|string|max:11',
             'bank_name' => 'nullable|string|max:255',
             'email' => 'nullable|email',
-            'notes' => 'nullable|string',
+            'notes' => 'nullable|string|max:1000',
         ]);
 
         $beneficiary->update($validated);

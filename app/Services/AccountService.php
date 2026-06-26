@@ -17,18 +17,41 @@ class AccountService
 
         $isFirst = $user->accounts()->count() === 0;
 
-        $account = DB::transaction(function () use ($user, $type, $currency, $label, $isFirst) {
+        $solarisAccountId = null;
+        $iban = null;
+
+        if ($user->solaris_person_id) {
+            $baasService = app(\App\Services\BaasService::class);
+            $res = $baasService->createAccount([
+                'external_person_id' => $user->solaris_person_id,
+                'currency' => $currency,
+            ]);
+
+            if ($res['success']) {
+                $solarisAccountId = $res['id'] ?? null;
+                $iban = $res['iban'] ?? null;
+            } else {
+                \Illuminate\Support\Facades\Log::error('BaaS: Failed to create account on Solarisbank: ' . ($res['error'] ?? 'Unknown error'));
+            }
+        }
+
+        if (!$iban) {
+            $iban = $this->generateIban($user->country_of_residence ?? 'DE');
+        }
+
+        $account = DB::transaction(function () use ($user, $type, $currency, $label, $isFirst, $solarisAccountId, $iban) {
             $account = Account::create([
                 'user_id' => $user->id,
                 'account_type_id' => $type->id,
                 'account_number' => $this->generateAccountNumber(),
-                'iban' => $this->generateIban($user->country_of_residence ?? 'DE'),
+                'iban' => $iban,
                 'swift_bic' => 'COBADEFFXXX',
                 'currency' => $currency,
                 'balance' => 0,
                 'available_balance' => 0,
                 'ledger_balance' => 0,
-                'status' => 'pending',
+                'status' => $solarisAccountId ? 'active' : 'pending',
+                'solaris_account_id' => $solarisAccountId,
                 'label' => $label ?? $type->name,
                 'is_default' => $isFirst,
             ]);

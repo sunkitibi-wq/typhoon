@@ -50,14 +50,16 @@ class SwiftService
         ]);
 
         if (!$baasResponse['success']) {
-            $debitAccount->balance += ($transaction->amount + $transaction->fee);
-            $debitAccount->available_balance += ($transaction->amount + $transaction->fee);
-            $debitAccount->save();
+            DB::transaction(function () use ($transaction, $debitAccount, $baasResponse) {
+                $debitAccount->balance += ($transaction->amount + $transaction->fee);
+                $debitAccount->available_balance += ($transaction->amount + $transaction->fee);
+                $debitAccount->save();
 
-            $transaction->update([
-                'status' => 'failed',
-                'failure_reason' => $baasResponse['error'] ?? 'BaaS initiation failed',
-            ]);
+                $transaction->update([
+                    'status' => 'failed',
+                    'failure_reason' => $baasResponse['error'] ?? 'BaaS initiation failed',
+                ]);
+            });
 
             throw new \RuntimeException("BaaS SWIFT Transfer initiation failed: " . ($baasResponse['error'] ?? 'Unknown error'));
         }

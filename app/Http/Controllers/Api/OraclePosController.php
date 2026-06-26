@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Banking\PosTerminal;
+use App\Models\Banking\PosTransaction;
 use App\Services\OraclePosIntegrationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -53,6 +54,12 @@ class OraclePosController extends Controller
             'preferred_crypto' => 'nullable|string|in:BTC,ETH,USDT,USDC',
         ]);
 
+        $terminal = PosTerminal::where('oracle_terminal_id', $validated['oracle_terminal_id'])->first();
+
+        if (!$terminal || $terminal->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
         try {
             $response = $this->integrationService->createOracleCharge(
                 $validated['oracle_terminal_id'],
@@ -67,8 +74,14 @@ class OraclePosController extends Controller
         }
     }
 
-    public function status(string $reference): JsonResponse
+    public function status(Request $request, string $reference): JsonResponse
     {
+        $posTransaction = PosTransaction::where('terminal_reference', $reference)->first();
+
+        if (!$posTransaction || $posTransaction->posTerminal->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
         try {
             $status = $this->integrationService->checkChargeStatus($reference);
             return response()->json($status);
@@ -83,6 +96,12 @@ class OraclePosController extends Controller
             'reference' => 'required|string',
             'tx_hash' => 'required|string',
         ]);
+
+        $posTransaction = PosTransaction::where('terminal_reference', $validated['reference'])->first();
+
+        if (!$posTransaction || $posTransaction->posTerminal->user_id !== $request->user()->id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
 
         try {
             $posTransaction = $this->integrationService->simulateCryptoPayment(

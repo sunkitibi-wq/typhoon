@@ -23,9 +23,10 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable([
-    'name', 'email', 'password', 'role_id', 'phone', 'nationality',
+    'name', 'email', 'password', 'phone', 'nationality',
     'date_of_birth', 'country_of_residence', 'kyc_level',
     'two_factor_enabled', 'status', 'terms_accepted_at',
+    'solaris_person_id',
 ])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable

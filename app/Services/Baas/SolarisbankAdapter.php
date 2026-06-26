@@ -84,6 +84,82 @@ class SolarisbankAdapter implements BaasAdapterInterface
         return $this->sendRequest("/v1/transfers/{$externalId}", 'GET');
     }
 
+    public function createPerson(array $params): array
+    {
+        $payload = [
+            'first_name' => $params['first_name'] ?? '',
+            'last_name' => $params['last_name'] ?? '',
+            'email' => $params['email'] ?? '',
+            'birth_date' => $params['date_of_birth'] ?? '',
+            'nationality' => $params['nationality'] ?? '',
+            'country_of_residence' => $params['country'] ?? '',
+            'mobile_number' => $params['phone_number'] ?? '',
+            'address' => [
+                'line_1' => $params['address_line1'] ?? '',
+                'line_2' => $params['address_line2'] ?? '',
+                'postal_code' => $params['postal_code'] ?? '',
+                'city' => $params['city'] ?? '',
+                'country' => $params['country'] ?? '',
+            ],
+        ];
+
+        return $this->sendRequest('/v1/persons', 'POST', $payload);
+    }
+
+    public function createAccount(array $params): array
+    {
+        $personId = $params['external_person_id'] ?? null;
+        if (!$personId) {
+            return [
+                'success' => false,
+                'error' => 'Missing external_person_id for Solarisbank account creation.',
+            ];
+        }
+
+        $payload = [
+            'currency' => $params['currency'] ?? 'EUR',
+            'type' => 'checking',
+        ];
+
+        return $this->sendRequest("/v1/persons/{$personId}/accounts", 'POST', $payload);
+    }
+
+    public function createCard(array $params): array
+    {
+        $personId = $params['external_person_id'] ?? null;
+        $accountId = $params['external_account_id'] ?? null;
+
+        if (!$personId || !$accountId) {
+            return [
+                'success' => false,
+                'error' => 'Missing external_person_id or external_account_id for card creation.',
+            ];
+        }
+
+        $payload = [
+            'type' => $params['type'] ?? 'virtual',
+            'cardholder_name' => $params['cardholder_name'] ?? '',
+        ];
+
+        return $this->sendRequest("/v1/persons/{$personId}/accounts/{$accountId}/cards", 'POST', $payload);
+    }
+
+    public function updateCardStatus(string $externalCardId, string $status): array
+    {
+        if ($status === 'blocked') {
+            return $this->sendRequest("/v1/cards/{$externalCardId}/block", 'POST');
+        } elseif ($status === 'active') {
+            return $this->sendRequest("/v1/cards/{$externalCardId}/unblock", 'POST');
+        } elseif ($status === 'closed') {
+            return $this->sendRequest("/v1/cards/{$externalCardId}/close", 'POST');
+        }
+
+        return [
+            'success' => false,
+            'error' => "Unsupported status transition: {$status}",
+        ];
+    }
+
     private function getAccessToken(): ?string
     {
         return Cache::remember('solarisbank:oauth_token', 3000, function () {

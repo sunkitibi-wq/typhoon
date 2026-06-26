@@ -147,7 +147,6 @@ class OraclePosIntegrationService
                     'crypto_currency' => $cryptoCode,
                     'crypto_amount' => $cryptoAmount,
                     'payment_address' => $paymentAddress,
-                    'private_key' => $keyPair['private_key'],
                 ],
             ]);
 
