@@ -50,6 +50,16 @@ class ProcessWebhookEvent implements ShouldQueue
             ];
             
             $this->event->event_type = 'transfer';
+        } elseif (isset($payload['event_type']) && in_array($payload['event_type'], ['IDENTIFICATION', 'MUTATION_IDENTIFICATION'])) {
+            $solarisPayload = $payload['payload'] ?? [];
+            $status = $solarisPayload['status'] ?? 'successful';
+            
+            $payload = [
+                'external_id' => $payload['resource_id'] ?? $solarisPayload['id'] ?? null,
+                'status' => $status === 'successful' ? 'completed' : ($status === 'failed' ? 'failed' : 'pending'),
+            ];
+            
+            $this->event->event_type = 'identification';
         }
 
         try {
@@ -61,6 +71,10 @@ class ProcessWebhookEvent implements ShouldQueue
 
                 case 'compliance':
                     $this->processComplianceEvent($payload);
+                    break;
+
+                case 'identification':
+                    $this->processIdentificationEvent($payload);
                     break;
 
                 default:
@@ -225,5 +239,40 @@ class ProcessWebhookEvent implements ShouldQueue
             'severity' => $severity,
             'description' => $description,
         ]);
+    }
+
+    private function processIdentificationEvent(array $payload): void
+    {
+        $externalId = $payload['external_id'] ?? null;
+        $status = $payload['status'] ?? null;
+
+        if (!$externalId) {
+            throw new \InvalidArgumentException("Webhook payload missing external_id for identification");
+        }
+
+        $verification = \App\Models\Banking\KycVerification::where('baas_identification_id', $externalId)->first();
+        if (!$verification) {
+            Log::info("ProcessWebhookEvent: No KYC verification found matching external ID: {$externalId}");
+            return;
+        }
+
+        if ($status === 'completed') {
+            $kycService = app(\App\Services\KycService::class);
+            $admin = \App\Models\User::role('admin')->first();
+            
+            if ($admin) {
+                $kycService->approveVerification($verification, $admin);
+                Log::info("ProcessWebhookEvent: Automatically approved KYC verification for user {$verification->user_id}");
+            } else {
+                Log::error("ProcessWebhookEvent: No admin found to approve KYC verification {$verification->id}");
+            }
+        } elseif ($status === 'failed') {
+            $verification->update([
+                'status' => 'rejected',
+                'rejection_reason' => 'Solarisbank identity verification failed or was rejected.',
+            ]);
+            $verification->user->update(['kyc_level' => 'unverified']);
+            \App\Events\KycStatusChanged::dispatch($verification);
+        }
     }
 }

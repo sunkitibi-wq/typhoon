@@ -45,6 +45,7 @@ class KycController extends Controller
                 'message' => 'KYC verification submitted successfully',
                 'status' => $verification->status,
                 'kyc_level' => $verification->kyc_level,
+                'redirect_url' => $verification->baas_identification_url,
             ]);
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 422);

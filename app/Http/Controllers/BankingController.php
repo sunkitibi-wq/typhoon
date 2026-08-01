@@ -344,6 +344,10 @@ class BankingController extends Controller
                     }
                 }
 
+                if ($verification->baas_identification_url) {
+                    return Inertia::location($verification->baas_identification_url);
+                }
+
                 return redirect()->back()->with('success', 'KYC submitted successfully. We will review your submission within 1-2 business days.');
             } catch (\Exception $e) {
                 return back()->withErrors(['error' => $e->getMessage()]);

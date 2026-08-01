@@ -160,6 +160,24 @@ class SolarisbankAdapter implements BaasAdapterInterface
         ];
     }
 
+    public function createIdentification(array $params): array
+    {
+        $personId = $params['external_person_id'] ?? null;
+        if (!$personId) {
+            return [
+                'success' => false,
+                'error' => 'Missing external_person_id for identification creation.',
+            ];
+        }
+
+        $payload = [
+            'method' => $params['method'] ?? 'video',
+            'language' => $params['language'] ?? 'EN',
+        ];
+
+        return $this->sendRequest("/v1/persons/{$personId}/identifications", 'POST', $payload);
+    }
+
     private function getAccessToken(): ?string
     {
         return Cache::remember('solarisbank:oauth_token', 3000, function () {

@@ -105,6 +105,26 @@ class BaasService
         ];
     }
 
+    public function createIdentification(array $params): array
+    {
+        if ($this->driver === 'mock') {
+            return [
+                'success' => true,
+                'id' => 'ident_' . Str::random(10),
+                'url' => 'https://mock-identification-url.com/session/' . Str::random(10),
+            ];
+        }
+
+        if ($this->adapter) {
+            return $this->adapter->createIdentification($params);
+        }
+
+        return [
+            'success' => false,
+            'error' => "BaaS driver [{$this->driver}] is not configured/supported.",
+        ];
+    }
+
     public function createAccount(array $params): array
     {
         if ($this->driver === 'mock') {

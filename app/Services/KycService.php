@@ -37,6 +37,46 @@ class KycService
                 ]
             );
 
+            $baasService = app(\App\Services\BaasService::class);
+            
+            if (!$user->solaris_person_id) {
+                $res = $baasService->createPerson([
+                    'first_name' => explode(' ', $user->name, 2)[0] ?? $user->name,
+                    'last_name' => explode(' ', $user->name, 2)[1] ?? $user->name,
+                    'email' => $user->email,
+                    'date_of_birth' => $verification->date_of_birth->format('Y-m-d'),
+                    'country' => $verification->country,
+                    'nationality' => $verification->nationality,
+                    'phone_number' => $user->phone_number ?? '+491701234567',
+                    'address_line1' => $verification->address_line1,
+                    'address_line2' => $verification->address_line2,
+                    'postal_code' => $verification->postal_code,
+                    'city' => $verification->city,
+                ]);
+
+                if ($res['success'] && isset($res['id'])) {
+                    $user->update(['solaris_person_id' => $res['id']]);
+                } else {
+                    \Illuminate\Support\Facades\Log::error('BaaS: Failed to create person on KYC submit: ' . ($res['error'] ?? 'Unknown error'));
+                }
+            }
+
+            if ($user->solaris_person_id) {
+                $identRes = $baasService->createIdentification([
+                    'external_person_id' => $user->solaris_person_id,
+                    'method' => 'video',
+                ]);
+
+                if ($identRes['success']) {
+                    $verification->update([
+                        'baas_identification_id' => $identRes['id'] ?? null,
+                        'baas_identification_url' => $identRes['url'] ?? null,
+                    ]);
+                } else {
+                    \Illuminate\Support\Facades\Log::error('BaaS: Failed to create identification on KYC submit: ' . ($identRes['error'] ?? 'Unknown error'));
+                }
+            }
+
             return $verification;
         });
     }
