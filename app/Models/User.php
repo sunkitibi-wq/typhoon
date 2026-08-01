@@ -3,11 +3,12 @@
 namespace App\Models;
 
 use App\Models\Banking\Account;
+use App\Models\Banking\Beneficiary;
+use App\Models\Banking\CryptoOrder;
 use App\Models\Banking\CryptoWallet;
 use App\Models\Banking\KycVerification;
 use App\Models\Banking\Loan;
 use App\Models\Banking\Transaction;
-use App\Models\Role;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -26,13 +27,13 @@ use Laravel\Sanctum\HasApiTokens;
     'name', 'email', 'password', 'phone', 'nationality',
     'date_of_birth', 'country_of_residence', 'kyc_level',
     'two_factor_enabled', 'status', 'terms_accepted_at',
-    'solaris_person_id',
+    'solaris_person_id', 'role_id',
 ])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable, SoftDeletes, Billable;
+    use Billable, HasApiTokens, HasFactory, Notifiable, SoftDeletes, TwoFactorAuthenticatable;
 
     protected function casts(): array
     {
@@ -88,12 +89,12 @@ class User extends Authenticatable
 
     public function beneficiaries(): HasMany
     {
-        return $this->hasMany(\App\Models\Banking\Beneficiary::class, 'user_id');
+        return $this->hasMany(Beneficiary::class, 'user_id');
     }
 
     public function cryptoOrders(): HasMany
     {
-        return $this->hasMany(\App\Models\Banking\CryptoOrder::class);
+        return $this->hasMany(CryptoOrder::class);
     }
 
     public function loans(): HasMany

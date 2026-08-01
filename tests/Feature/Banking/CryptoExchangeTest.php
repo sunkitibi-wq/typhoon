@@ -3,8 +3,6 @@
 namespace Tests\Feature\Banking;
 
 use App\Models\Banking\CryptoCurrency;
-use App\Models\Banking\CryptoOrder;
-use App\Models\Banking\CryptoWallet;
 use App\Models\Banking\ExchangeRate;
 use App\Models\Role;
 use App\Models\User;
@@ -17,8 +15,11 @@ class CryptoExchangeTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private CryptoCurrency $btc;
+
     private CryptoCurrency $eur;
+
     private CryptoExchangeService $service;
 
     protected function setUp(): void
@@ -350,7 +351,7 @@ class CryptoExchangeTest extends TestCase
         $response = $this->actingAs($this->user)->postJson('/api/crypto/transactions/send', [
             'wallet_id' => $ethWallet->id,
             'amount' => 1,
-            'to_address' => '0xdestination123',
+            'to_address' => '0x0123456789abcdef0123456789abcdef01234567',
         ]);
 
         $response->assertCreated()

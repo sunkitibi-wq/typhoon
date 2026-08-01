@@ -48,6 +48,10 @@ return [
         'base_url' => env('BAAS_BASE_URL', 'https://api.sandbox.baas-provider.com'),
     ],
 
+    'banking_webhook' => [
+        'secret' => env('BANKING_WEBHOOK_SECRET'),
+    ],
+
     'exchange_rates' => [
         'source' => env('EXCHANGE_RATE_SOURCE', 'mock'),
         'coinmarketcap_key' => env('COINMARKETCAP_API_KEY'),

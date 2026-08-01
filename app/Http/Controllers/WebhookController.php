@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\ProcessWebhookEvent;
 use App\Models\Banking\WebhookEvent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -12,8 +13,19 @@ class WebhookController extends Controller
     {
         $validEventTypes = ['transfer', 'payment', 'account', 'compliance'];
 
-        if (!in_array($event, $validEventTypes)) {
+        if (! in_array($event, $validEventTypes)) {
             return response()->json(['error' => 'Invalid event type'], 400);
+        }
+
+        $secret = config('services.banking_webhook.secret');
+
+        if ($secret) {
+            $signature = $request->header('X-Webhook-Signature');
+            $expected = hash_hmac('sha256', $request->getContent(), $secret);
+
+            if (! is_string($signature) || ! hash_equals($expected, $signature)) {
+                return response()->json(['error' => 'Invalid signature'], 401);
+            }
         }
 
         $payload = $request->all();
@@ -26,7 +38,7 @@ class WebhookController extends Controller
                 'status' => 'pending',
             ]);
 
-            \App\Jobs\ProcessWebhookEvent::dispatch($webhookEvent);
+            ProcessWebhookEvent::dispatch($webhookEvent);
 
             Log::info('Webhook received and dispatched', [
                 'event' => $event,

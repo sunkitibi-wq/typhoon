@@ -16,3 +16,7 @@ Schedule::command('typhoon:update-exchange-rates --source=coinapi')
 Schedule::command('typhoon:check-crypto-deposits')
     ->everyMinute()
     ->withoutOverlapping();
+
+Schedule::command('typhoon:process-standing-orders')
+    ->dailyAt('02:00')
+    ->withoutOverlapping();

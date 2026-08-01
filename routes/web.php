@@ -2,28 +2,32 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\BankingController;
-use App\Http\Controllers\CorporateController;
 use App\Http\Controllers\CardController;
+use App\Http\Controllers\CorporateController;
+use App\Http\Controllers\WebhookController;
+use App\Http\Middleware\EnsureUserHasRole;
+use App\Models\Banking\ExchangeRate;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
-Route::aliasMiddleware('role', App\Http\Middleware\EnsureUserHasRole::class);
+Route::aliasMiddleware('role', EnsureUserHasRole::class);
 
 Route::inertia('/', 'welcome', [
     'canRegister' => Features::enabled(Features::registration()),
-    'rates' => fn() => \App\Models\Banking\ExchangeRate::where('quote_currency', 'EUR')
+    'rates' => fn () => ExchangeRate::where('quote_currency', 'EUR')
         ->latest('last_refreshed_at')
-        ->get()
+        ->get(),
 ])->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function () {
-    $user = request()->user();
-    if ($user?->isAdmin()) {
-        return redirect()->route('admin.dashboard');
-    }
-    return redirect()->route('banking.dashboard');
-})->name('dashboard');
+        $user = request()->user();
+        if ($user?->isAdmin()) {
+            return redirect()->route('admin.dashboard');
+        }
+
+        return redirect()->route('banking.dashboard');
+    })->name('dashboard');
 
     Route::prefix('banking')->name('banking.')->group(function () {
         Route::get('dashboard', [BankingController::class, 'dashboard'])->name('dashboard');
@@ -66,10 +70,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('cards', [CardController::class, 'store'])->name('cards.store');
         Route::post('cards/{card}/toggle', [CardController::class, 'toggleStatus'])->name('cards.toggle');
         Route::post('cards/{card}/pin', [CardController::class, 'setPin'])->name('cards.pin');
-    });
-
-    Route::prefix('webhooks')->name('webhooks.')->group(function () {
-        Route::post('banking/{event}', [\App\Http\Controllers\WebhookController::class, 'handle'])->name('banking');
     });
 
     Route::middleware(['role:admin'])->prefix('admin')->name('admin.')->group(function () {
@@ -116,6 +116,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::match(['get', 'post'], 'team', [CorporateController::class, 'team'])->name('team');
         Route::match(['get', 'post'], 'bulk-payments', [CorporateController::class, 'bulkPayments'])->name('bulk-payments');
     });
+});
+
+Route::prefix('webhooks')->name('webhooks.')->group(function () {
+    Route::post('banking/{event}', [WebhookController::class, 'handle'])->name('banking');
 });
 
 require __DIR__.'/settings.php';

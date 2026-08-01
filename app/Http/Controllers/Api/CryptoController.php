@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Banking\Account;
 use App\Models\Banking\CryptoCurrency;
 use App\Models\Banking\CryptoDeposit;
 use App\Models\Banking\CryptoWallet;
@@ -30,7 +31,7 @@ class CryptoController extends Controller
         $wallets = $request->user()->cryptoWallets()->with('cryptoCurrency')->get();
 
         return response()->json([
-            'wallets' => $wallets->map(fn($w) => [
+            'wallets' => $wallets->map(fn ($w) => [
                 'id' => $w->id,
                 'user_id' => $w->user_id,
                 'crypto_currency_id' => $w->crypto_currency_id,
@@ -90,7 +91,7 @@ class CryptoController extends Controller
         $rates = ExchangeRate::latest('last_refreshed_at')->get();
 
         return response()->json([
-            'rates' => $rates->map(fn($r) => [
+            'rates' => $rates->map(fn ($r) => [
                 'base_currency' => $r->base_currency,
                 'quote_currency' => $r->quote_currency,
                 'pair' => "{$r->base_currency}/{$r->quote_currency}",
@@ -210,7 +211,7 @@ class CryptoController extends Controller
         $validated = $request->validate([
             'wallet_id' => 'required|exists:crypto_wallets,id',
             'amount' => 'required|numeric|min:0.00000001',
-            'to_address' => 'required|string|max:255|regex:/^(0x[a-fA-F0-9]{40}|[13][a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[a-zA-HJ-NP-Z0-9]{25,39})$/',
+            'to_address' => ['required', 'string', 'max:255', 'regex:/^(0x[a-fA-F0-9]{40}|[13][a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[a-zA-HJ-NP-Z0-9]{25,39})$/'],
         ]);
 
         $wallet = CryptoWallet::findOrFail($validated['wallet_id']);
@@ -237,7 +238,7 @@ class CryptoController extends Controller
         $validated = $request->validate([
             'wallet_id' => 'required|exists:crypto_wallets,id',
             'amount' => 'required|numeric|min:0.00000001',
-            'to_address' => 'required|string|max:255|regex:/^(0x[a-fA-F0-9]{40}|[13][a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[a-zA-HJ-NP-Z0-9]{25,39})$/',
+            'to_address' => ['required', 'string', 'max:255', 'regex:/^(0x[a-fA-F0-9]{40}|[13][a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[a-zA-HJ-NP-Z0-9]{25,39})$/'],
             'gas_limit' => 'nullable|integer|min:21000',
             'gas_price' => 'nullable|string|max:255',
         ]);
@@ -291,7 +292,7 @@ class CryptoController extends Controller
             'external_address' => 'nullable|string|max:255|regex:/^(0x[a-fA-F0-9]{40}|[13][a-km-zA-HJ-NP-Z1-9]{25,34}|bc1[a-zA-HJ-NP-Z0-9]{25,39})$/',
         ]);
 
-        $account = \App\Models\Banking\Account::findOrFail($validated['account_id']);
+        $account = Account::findOrFail($validated['account_id']);
 
         try {
             $result = $this->cryptoService->buyWithFiat(
@@ -319,7 +320,7 @@ class CryptoController extends Controller
             'amount' => 'required|numeric|min:0.00000001',
         ]);
 
-        $account = \App\Models\Banking\Account::findOrFail($validated['account_id']);
+        $account = Account::findOrFail($validated['account_id']);
 
         try {
             $result = $this->cryptoService->sellToFiat(

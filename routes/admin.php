@@ -1,41 +1,29 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AdminController;
 use App\Models\Banking\KycVerification;
+use App\Models\Banking\MonitoringAlert;
+use App\Services\ReportService;
+use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'role:admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
         Route::get('home', function () {
-            $reportService = app(\App\Services\ReportService::class);
+            $reportService = app(ReportService::class);
             $data = $reportService->adminDashboard();
 
-            $pendingKycs = \App\Models\Banking\KycVerification::with('user')
+            $pendingKycs = KycVerification::with('user')
                 ->where('status', 'pending')
                 ->latest()
                 ->take(5)
                 ->get();
 
-            $recentAlerts = \App\Models\Banking\MonitoringAlert::with('user', 'transaction')
+            $recentAlerts = MonitoringAlert::with('user', 'transaction')
                 ->latest()
                 ->take(5)
                 ->get();
 
             return view('admin.dashboard', compact('data', 'pendingKycs', 'recentAlerts'));
         })->name('home');
-
-        Route::get('dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
-        Route::get('kyc', [AdminController::class, 'kyc'])->name('kyc');
-        Route::post('kyc/{kyc}/approve', [AdminController::class, 'approveKyc'])->name('kyc.approve');
-        Route::post('kyc/{kyc}/reject', [AdminController::class, 'rejectKyc'])->name('kyc.reject');
-        Route::get('accounts', [AdminController::class, 'accounts'])->name('accounts');
-        Route::post('accounts/{account}/approve', [AdminController::class, 'approveAccount'])->name('accounts.approve');
-        Route::post('accounts/{account}/reject', [AdminController::class, 'rejectAccount'])->name('accounts.reject');
-        Route::post('accounts/{account}/freeze', [AdminController::class, 'freezeAccount'])->name('accounts.freeze');
-        Route::post('accounts/{account}/unfreeze', [AdminController::class, 'unfreezeAccount'])->name('accounts.unfreeze');
-        Route::post('accounts/{account}/close', [AdminController::class, 'closeAccount'])->name('accounts.close');
-        // add more admin routes as needed
     });
-
